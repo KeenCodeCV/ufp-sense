@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WU UFP SENSE</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="text-slate-700 bg-slate-50 font-prompt relative">
+
+    <div id="loader-wrapper"
+        class="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-50 transition-opacity duration-500">
+        <div aria-label="Orange and tan hamster running in a metal wheel" role="img" class="wheel-and-hamster">
+            <div class="wheel"></div>
+            <div class="hamster">
+                <div class="hamster__body">
+                    <div class="hamster__head">
+                        <div class="hamster__ear"></div>
+                        <div class="hamster__eye"></div>
+                        <div class="hamster__nose"></div>
+                    </div>
+                    <div class="hamster__limb hamster__limb--fr"></div>
+                    <div class="hamster__limb hamster__limb--fl"></div>
+                    <div class="hamster__limb hamster__limb--br"></div>
+                    <div class="hamster__limb hamster__limb--bl"></div>
+                    <div class="hamster__tail"></div>
+                </div>
+            </div>
+            <div class="spoke"></div>
+        </div>
+        <h2 class="mt-8 text-xl font-bold text-slate-500 animate-pulse font-prompt tracking-wider">
+            กำลังวิเคราะห์ข้อมูล...</h2>
+    </div>
+
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3">
+                        <img src="https://img2.pic.in.th/WU.png" alt="WU" class="h-12 w-auto object-contain">
+                        <img src="https://img5.pic.in.th/file/secure-sv1/ITD6209407e48bd9033.png" alt="ITD"
+                            class="h-12 w-auto object-contain">
+                        <img src="https://img5.pic.in.th/file/secure-sv1/706507857101af6d43e9fafd62b35bc6.png" alt="UFP"
+                            class="h-12 w-auto object-contain">
+                    </div>
+
+
+                    <div>
+                        <h1 class="text-2xl font-bold text-blue-900 tracking-tight">UFP SENSE</h1>
+                        <p class="text-xs text-slate-500 -mt-1">WU Ultrafine Particle Sensor</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 text-sm text-slate-500 hidden sm:flex">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-regular fa-calendar"></i>
+                        <span id="currentDate">Loading...</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="currentTime">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <div
+            class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap justify-center gap-4 sm:gap-8 text-sm animate-fade-in">
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#5dbb47] ring-2 ring-green-200"></span>
+                <span>Safe (&lt; 1,000 #/cm³)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#f0b100] ring-2 ring-yellow-200"></span>
+                <span>Warning (1,000 - 10,000 #/cm³)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#d93a3a] ring-2 ring-red-200"></span>
+                <span>Danger (&gt; 10,000 #/cm³)</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <div class="lg:col-span-2 relative">
+                <div class="h-full bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-4">
+
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h2
+                                class="text-[20px] font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                                <i class="fa-solid fa-layer-group"></i> INDOOR PREDICTION
+                            </h2>
+                        </div>
+                        <div id="realTimeIndicator"
+                            class="bg-red-50 text-red-500 px-4 py-1.5 rounded-full text-[13px] font-bold flex items-center gap-2 border border-red-100 transition-colors duration-300">
+                            <span class="relative flex h-2.5 w-2.5">
+                                <span id="rtPing"
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span id="rtDot"
+                                    class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                            </span>
+                            Real-time
+                        </div>
+                    </div>
+
+                    <div id="middleWrapper"
+                        class="bg-[#eef8eb] rounded-[24px] p-4 flex flex-col sm:flex-row gap-4 items-stretch transition-colors duration-500">
+
+                        <div id="iconBoxBg"
+                            class="bg-[#5dbb47] rounded-[20px] flex items-center justify-center sm:w-2/5 p-6 sm:p-8 transition-colors duration-500 group cursor-pointer">
+                            <div
+                                class="bg-white rounded-full w-36 h-36 sm:w-48 sm:h-48 flex items-center justify-center p-3 shadow-sm transform transition-all duration-300 group-hover:scale-110 group-hover:shadow-lg">
+                                <img id="indoorIcon" src="https://img5.pic.in.th/file/secure-sv1/Safe123.png"
+                                    alt="Status Face" class="w-full h-full object-contain">
+                            </div>
+                        </div>
+
+                        <div class="flex-1 flex flex-col gap-3 justify-center">
+                            <div class="bg-white rounded-[20px] p-6 sm:px-8 sm:py-8 shadow-sm">
+                                <div class="flex items-baseline gap-2 mb-1">
+                                    <span id="pm01Value"
+                                        class="text-6xl sm:text-[76px] font-extrabold text-[#5dbb47] tracking-tighter transition-colors duration-500 font-sans leading-none">--</span>
+                                    <span id="pm01Unit"
+                                        class="text-3xl sm:text-[40px] font-black text-[#5dbb47] transition-colors duration-500">#/cm³</span>
+                                </div>
+                                <p class="text-slate-500 text-[15px] font-medium">Ultrafine Particle Count
+                                    (PC<sub>0.1</sub>)</p>
+                            </div>
+
+                            <div class="self-start ml-2">
+                                <span id="pm01StatusPill"
+                                    class="inline-flex items-center px-4 py-2 rounded-lg bg-white text-[#5dbb47] font-bold text-[15px] shadow-sm transition-all duration-500">
+                                    <i id="pm01StatusIcon" class="fa-solid fa-circle-check mr-2"></i> <span
+                                        id="pm01StatusText">Status: Safe</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="alertBoxBg"
+                        class="bg-[#eef8eb] rounded-[20px] p-4 sm:px-6 sm:py-5 flex items-start sm:items-center gap-4 transition-colors duration-500 mt-1">
+                        <div class="bg-white/60 p-2.5 rounded-lg flex-shrink-0 shadow-sm">
+                            <i class="fa-solid fa-robot text-slate-700 text-xl animate-bounce" id="alertIcon"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-[13px] font-bold text-slate-800 uppercase tracking-widest mb-1 opacity-80">
+                                AI Insights Analysis</h4>
+                            <p class="text-[15px] font-medium text-slate-800 leading-relaxed" id="suggestionText">
+                                waiting to receive data from the sensors to analyze the environment....
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col gap-4">
+                <div class="text-[20px] font-black text-slate-800 flex items-center gap-2 uppercase tracking-wide">
+                    <i class="fa-solid fa-cloud-sun text-xl"></i>
+                    <h3 class="font-bold uppercase tracking-wider text-base">Outdoor Factors</h3>
+                </div>
+                <div class="grid grid-cols-2 gap-5 h-full">
+
+                    <div class="factor-card bg-blue-50 hover:bg-blue-100 border border-blue-100">
+                        <p class="text-slate-500 text-sm font-medium mb-1 lg:mb-2">PM<sub>2.5</sub></p>
+                        <div
+                            class="flex flex-row lg:flex-col items-baseline lg:items-center justify-center gap-1 lg:gap-0 text-blue-700">
+                            <span class="text-4xl font-bold" id="val-pm25">--</span>
+                            <span class="text-lg lg:text-base font-normal text-slate-500">µg/m³</span>
+                        </div>
+                    </div>
+
+                    <div
+                        class="factor-card bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 flex flex-col items-center justify-center relative overflow-hidden group">
+                        <p class="text-slate-500 text-sm font-medium mb-2 z-10 relative">Wind Direction</p>
+                        <div class="relative w-16 h-16 flex items-center justify-center z-10 mb-1">
+                            <div
+                                class="absolute inset-0 rounded-full border-[3px] border-indigo-200 bg-white shadow-inner">
+                            </div>
+                            <span class="absolute top-[2px] text-[10px] font-bold text-slate-400 leading-none">N</span>
+                            <span
+                                class="absolute bottom-[2px] text-[10px] font-bold text-slate-400 leading-none">S</span>
+                            <span
+                                class="absolute right-[4px] text-[10px] font-bold text-slate-400 leading-none">E</span>
+                            <span class="absolute left-[4px] text-[10px] font-bold text-slate-400 leading-none">W</span>
+                            <div class="absolute w-2 h-2 bg-indigo-800 rounded-full z-20 shadow-sm"></div>
+                            <div id="windCompass"
+                                class="absolute w-full h-full transform transition-transform duration-1000 ease-in-out z-10 origin-center">
+                                <div
+                                    class="absolute top-[18%] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[25px] border-b-indigo-600 drop-shadow-md">
+                                </div>
+                                <div
+                                    class="absolute bottom-[18%] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[25px] border-t-slate-300 drop-shadow-md">
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="flex items-baseline justify-center gap-1 whitespace-nowrap text-indigo-700 z-10 relative">
+                            <span class="text-2xl font-bold" id="val-wind-dir-deg">--°</span>
+                            <span class="text-sm font-bold text-indigo-400" id="val-wind-dir-name"></span>
+                        </div>
+                    </div>
+
+                    <div class="factor-card bg-orange-50 hover:bg-orange-100 border border-orange-100">
+                        <p class="text-slate-500 text-sm font-medium mb-1 lg:mb-2">Temp</p>
+                        <div
+                            class="flex flex-row lg:flex-col items-baseline lg:items-center justify-center gap-1 lg:gap-0 text-orange-600">
+                            <span class="text-4xl font-bold" id="val-temp">--</span>
+                            <span class="text-lg lg:text-base font-normal text-slate-500">°C</span>
+                        </div>
+                    </div>
+
+                    <div class="factor-card bg-cyan-50 hover:bg-cyan-100 border border-cyan-100">
+                        <p class="text-slate-500 text-sm font-medium mb-1 lg:mb-2">Humidity</p>
+                        <div
+                            class="flex flex-row lg:flex-col items-baseline lg:items-center justify-center gap-1 lg:gap-0 text-cyan-600">
+                            <span class="text-4xl font-bold" id="val-humid">--</span>
+                            <span class="text-lg lg:text-base font-normal text-slate-500">%</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h3 class="text-xl font-bold text-slate-700 mb-6 flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-blue-500"></i> Trends Analysis
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="chart-container relative">
+                    <div class="mb-4 flex justify-between items-start">
+                        <div>
+                            <h4 class="font-semibold text-slate-700 text-lg">Current (Live)</h4>
+                            <p class="text-sm text-slate-400">Updates every 5 mins</p>
+                        </div>
+                        <span
+                            class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold">PC<sub>0.1</sub></span>
+                    </div>
+                    <canvas id="chartCurrent"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="mb-4">
+                        <h4 class="font-semibold text-slate-700 text-lg">1 Hour Average</h4>
+                        <p class="text-sm text-slate-400">Hourly trend</p>
+                    </div>
+                    <canvas id="chartHour"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="mb-4">
+                        <h4 class="font-semibold text-slate-700 text-lg">24 Hours Average</h4>
+                        <p class="text-sm text-slate-400">Daily overview</p>
+                    </div>
+                    <canvas id="chartDay"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div class="fixed bottom-4 right-4 flex gap-2 z-50">
+        <button onclick="startTestMode()"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-lg transition transform hover:scale-105 flex items-center">
+            <i class="fa-solid fa-play mr-2"></i> Test System
+        </button>
+        <button onclick="resetSystem()"
+            class="bg-slate-500 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-full shadow-lg transition transform hover:scale-105 flex items-center">
+            <i class="fa-solid fa-rotate-left mr-2"></i> Reset
+        </button>
+    </div>
+
+    <footer class="mt-12 py-8 bg-white border-t border-slate-100 text-center text-slate-400 text-sm">
+        <p class="font-semibold text-slate-500">&copy; 2026 Walailak University</p>
+        <p class="text-xs mt-1">School of Information Technology and Digital Innovation</p>
+        <p class="text-xs mt-2 opacity-75">Project: Design and development of machine learning model for indoor
+            ultrafine
+            particle prediction using outdoor ambient factors</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
