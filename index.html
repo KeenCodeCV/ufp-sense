@@ -77,19 +77,22 @@
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-        <div
-            class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap justify-center gap-4 sm:gap-8 text-sm animate-fade-in">
+        <div class="bg-white rounded-xl shadow-sm p-4 flex flex-wrap justify-center gap-4 sm:gap-8 text-sm animate-fade-in">
             <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-[#5dbb47] ring-2 ring-green-200"></span>
-                <span>Safe (&lt; 1,000 #/cm³)</span>
+                <span>Safe (&lt; 1,000)</span>
             </div>
             <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-[#f0b100] ring-2 ring-yellow-200"></span>
-                <span>Warning (1,000 - 10,000 #/cm³)</span>
+                <span>Moderate (1k - 10k)</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-[#f97316] ring-2 ring-orange-200"></span>
+                <span>High (10k - 20k)</span>
             </div>
             <div class="flex items-center gap-2">
                 <span class="w-3 h-3 rounded-full bg-[#d93a3a] ring-2 ring-red-200"></span>
-                <span>Danger (&gt; 10,000 #/cm³)</span>
+                <span>Danger (&gt; 20,000)</span>
             </div>
         </div>
 

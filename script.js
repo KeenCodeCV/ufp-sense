@@ -45,20 +45,13 @@ window.updateStatus = function (value, aiText = null) {
     const suggestionText = document.getElementById('suggestionText');
     const alertIcon = document.getElementById('alertIcon');
 
-    // การคุมปุ่ม Real-time
-    const realTimeIndicator = document.getElementById('realTimeIndicator');
-    const rtPing = document.getElementById('rtPing');
-    const rtDot = document.getElementById('rtDot');
-
     if (pm01Value) pm01Value.textContent = value.toLocaleString();
 
-    // รายการคลาสทั้งหมดที่ต้องจัดการเพื่อเคลียร์ค่าก่อนเปลี่ยนสี
-    const allBgs = ['bg-[#5dbb47]', 'bg-[#f0b100]', 'bg-[#d93a3a]', 'bg-slate-300'];
-    const allLightBgs = ['bg-[#eef8eb]', 'bg-[#fef0b8]', 'bg-[#f8d7d7]', 'bg-slate-50'];
-    const allTexts = ['text-[#5dbb47]', 'text-[#f0b100]', 'text-[#d93a3a]', 'text-slate-400', 'text-slate-500', 'text-slate-700'];
-    const allBorders = ['border-[#5dbb47]/20', 'border-[#f0b100]/20', 'border-[#d93a3a]/20', 'border-slate-200'];
+    // เพิ่มชุดสีส้มเข้าไป
+    const allBgs = ['bg-[#5dbb47]', 'bg-[#f0b100]', 'bg-[#f97316]', 'bg-[#d93a3a]', 'bg-slate-300'];
+    const allLightBgs = ['bg-[#eef8eb]', 'bg-[#fef0b8]', 'bg-[#ffedd5]', 'bg-[#f8d7d7]', 'bg-slate-50'];
+    const allTexts = ['text-[#5dbb47]', 'text-[#f0b100]', 'text-[#f97316]', 'text-[#d93a3a]', 'text-slate-400', 'text-slate-500'];
 
-    // Reset classes ทั้งหมดให้สะอาดก่อนใส่สีใหม่
     if (middleWrapper) middleWrapper.classList.remove(...allLightBgs);
     if (alertBoxBg) alertBoxBg.classList.remove(...allLightBgs);
     if (iconBoxBg) iconBoxBg.classList.remove(...allBgs);
@@ -67,16 +60,11 @@ window.updateStatus = function (value, aiText = null) {
     if (pm01StatusPill) pm01StatusPill.classList.remove(...allTexts, 'animate-pulse');
     if (pm01StatusText) pm01StatusText.classList.remove('text-blink');
 
-    // เมื่อมีข้อมูล ปรับ Real-time เป็นสีเขียว (Active)
-    if (realTimeIndicator) {
-        realTimeIndicator.classList.remove('bg-red-50', 'text-red-500', 'border-red-100');
-        realTimeIndicator.classList.add('bg-green-50', 'text-green-600', 'border-green-100');
-    }
-    if (rtPing) rtPing.classList.replace('bg-red-400', 'bg-green-400');
-    if (rtDot) rtDot.classList.replace('bg-red-500', 'bg-green-500');
-
+    // ===================================
+    // เงื่อนไข 4 ระดับใหม่
+    // ===================================
     if (value < 1000) {
-        // === Safe ===
+        // === 🟢 Safe (เขียว) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#eef8eb]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#eef8eb]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#5dbb47]');
@@ -88,10 +76,10 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-circle-check mr-2 text-lg';
         if (pm01StatusText) pm01StatusText.innerText = 'Status: Safe';
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#5dbb47] text-xl animate-bounce';
-        if (suggestionText) suggestionText.textContent = aiText || "Air quality is excellent, making it safe for all types of indoor activities.";
+        if (suggestionText) suggestionText.textContent = aiText;
 
-    } else if (value >= 1000 && value <= 10000) {
-        // === Warning ===
+    } else if (value >= 1000 && value < 10000) {
+        // === 🟡 Moderate (เหลือง) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#fef0b8]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#fef0b8]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#f0b100]');
@@ -101,15 +89,31 @@ window.updateStatus = function (value, aiText = null) {
 
         if (indoorIcon) indoorIcon.src = 'https://img2.pic.in.th/Warning123.png';
         if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-triangle-exclamation mr-2 text-lg';
+        if (pm01StatusText) pm01StatusText.innerText = 'Status: Moderate';
+        if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f0b100] text-xl animate-bounce';
+        if (suggestionText) suggestionText.textContent = aiText;
+
+    } else if (value >= 10000 && value < 20000) {
+        // === 🟠 High (ส้ม) ===
+        if (middleWrapper) middleWrapper.classList.add('bg-[#ffedd5]');
+        if (alertBoxBg) alertBoxBg.classList.add('bg-[#ffedd5]');
+        if (iconBoxBg) iconBoxBg.classList.add('bg-[#f97316]');
+        if (pm01Value) pm01Value.classList.add('text-[#f97316]');
+        if (pm01Unit) pm01Unit.classList.add('text-[#f97316]');
+        if (pm01StatusPill) pm01StatusPill.classList.add('text-[#f97316]');
+
+        // อิโมจิสีส้มที่คุณส่งมา!
+        if (indoorIcon) indoorIcon.src = 'https://img2.pic.in.th/641319986_1432330355266272_9107297040447500607_n-removebg-preview.png';
+        if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-bell mr-2 text-lg';
         if (pm01StatusText) {
-            pm01StatusText.innerText = 'Status: Warning';
+            pm01StatusText.innerText = 'Status: High';
             pm01StatusText.classList.add('text-blink');
         }
-        if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f0b100] text-xl animate-bounce';
-        if (suggestionText) suggestionText.textContent = aiText || "Air quality is moderate, with dust accumulation beginning. Those with weakened health should monitor their symptoms.";
+        if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f97316] text-xl animate-bounce';
+        if (suggestionText) suggestionText.textContent = aiText;
 
     } else {
-        // === Danger ===
+        // === 🔴 Danger (แดง) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#f8d7d7]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#f8d7d7]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#d93a3a]');
@@ -124,7 +128,7 @@ window.updateStatus = function (value, aiText = null) {
             pm01StatusText.classList.add('text-blink');
         }
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#d93a3a] text-xl animate-bounce';
-        if (suggestionText) suggestionText.textContent = aiText || "Danger! Pollution levels are extremely high. Reduce dust-generating activities and wear a protective mask immediately.";
+        if (suggestionText) suggestionText.textContent = aiText;
     }
 }
 
