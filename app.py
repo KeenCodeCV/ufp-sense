@@ -176,7 +176,9 @@ st.set_page_config(layout="wide", page_title="WFP SENSE Dashboard", initial_side
 st.markdown("""
     <style>
         .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
-        header { visibility: hidden !important; }
+        /* ซ่อนแค่เมนูย่อยของ Streamlit แต่ปล่อยปุ่มเปิด/ปิด Sidebar ไว้ */
+        #MainMenu {visibility: hidden;} 
+        footer {visibility: hidden;}
         div[data-testid="stAlert"] { margin-top: -15px !important; padding: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
