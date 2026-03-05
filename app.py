@@ -149,7 +149,9 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
             {js_content} 
             
             setTimeout(function() {{
+                // ส่งค่า pm01 และ ai_text (ใส่ใน backticks) ไปให้ JavaScript
                 if(window.updateStatus) window.updateStatus({pm01_val}, `{ai_text}`);
+                
                 if(window.updateWindDirection) window.updateWindDirection({wind_val});
                 
                 // อัปเดตกราฟด้วยข้อมูลใหม่
