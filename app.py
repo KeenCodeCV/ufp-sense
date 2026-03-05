@@ -237,3 +237,16 @@ if uploaded_file is not None and selected_model_name in models:
             st.error(f"ข้อมูลไม่เพียงพอ! ต้องการอย่างน้อย {seq_len} แถว (ปัจจุบันมี {len(input_df)} แถว)")
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
+        
+# ---------------------------------------------
+# จุดที่เพิ่มกลับเข้ามา (ถ้าไม่มีไฟล์ให้อัปโหลด)
+# ---------------------------------------------
+else:
+    if uploaded_file is None:
+        st.info("👈 กรุณาอัปโหลดไฟล์ CSV ทางด้านซ้ายเพื่อเริ่มการทำนาย")
+        try:
+            # ส่งค่า 0 ไปให้ครบ 6 ค่าตามฟังก์ชันใหม่ที่อัปเดตไป
+            html_content = render_web_interface(0, 0, 0, 0, 0, 0, "No Model")
+            components.html(html_content, height=1100, scrolling=True)
+        except:
+            pass
