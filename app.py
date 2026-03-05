@@ -237,7 +237,11 @@ if uploaded_file is not None and selected_model_name in models:
             with torch.no_grad():
                 pred_scaled = model(input_tensor)
             
-            pred_val = int(y_scaler.inverse_transform(pred_scaled.cpu().numpy())[0][0])
+            # ถอดสเกลค่าเดิมที่โมเดลทำนายออกมา (หน่วยดิบคือ PC/L)
+            raw_pred_val = y_scaler.inverse_transform(pred_scaled.cpu().numpy())[0][0]
+            
+            # ทำ Unit Conversion แปลงหน่วยจาก PC/L เป็น PC/cm³
+            pred_val = int(raw_pred_val / 1000)
             
             html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, selected_model_name)
             components.html(html_content, height=1100, scrolling=True)
