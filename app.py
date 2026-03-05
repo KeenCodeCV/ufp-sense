@@ -134,7 +134,7 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
         injection_script = f"<script>{js_content}\n setTimeout(function() {{ if(window.resetSystem) window.resetSystem(); }}, 500);</script>"
     else:
         # วิเคราะห์ Insight
-        ai_text = generate_ai_insight(pm01_val, pm25_val, wind_speed, temp_val, humid_val)
+        ai_text = generate_ai_insight(pred_val, pm25_disp, wind_spd, temp_disp, humid_disp)
         
         # สร้างข้อมูลกราฟจำลองเพื่อให้สอดคล้องกับค่า PM0.1 ปัจจุบัน (เพื่อให้กราฟดูสมจริง)
         # Current (6 จุด)
@@ -149,23 +149,13 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
             {js_content} 
             
             setTimeout(function() {{
-                if(window.updateStatus) window.updateStatus({pm01_val}, `{ai_text}`);
-                if(window.updateWindDirection) window.updateWindDirection({wind_val});
-                
-                // อัปเดตกราฟด้วยข้อมูลใหม่
-                if(window.updateCharts) window.updateCharts({chart_current}, {chart_hour}, {chart_day});
-                
-                var pm25Elem = document.getElementById('val-pm25');
-                var tempElem = document.getElementById('val-temp');
-                var humidElem = document.getElementById('val-humid');
-                var modelElem = document.getElementById('modelNameDisplay');
-                
-                if(pm25Elem) pm25Elem.innerHTML = '{pm25_val} <span class="text-xs font-normal text-slate-500">µg/m³</span>';
-                if(tempElem) tempElem.innerHTML = '{temp_val} <span class="text-xs font-normal text-slate-500">°C</span>';
-                if(humidElem) humidElem.innerHTML = '{humid_val} <span class="text-xs font-normal text-slate-500">%</span>';
-                if(modelElem) modelElem.innerText = 'Predicted by {model_name} Model';
-                
-            }}, 500);
+        // ✅ ต้องมี `, `{ai_text}`` ต่อท้าย pred_val แบบนี้
+        if(window.updateStatus) window.updateStatus({pred_val}, `{ai_text}`);
+        
+        if(window.updateWindDirection) window.updateWindDirection({wind_disp});
+        if(window.updateOtherStats) window.updateOtherStats({pm25_disp}, {temp_disp}, {humid_disp}, {wind_spd});
+        if(window.renderCharts) window.renderCharts({pred_val});
+    }}, 500);
         </script>
         """
 
