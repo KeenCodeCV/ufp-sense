@@ -48,12 +48,9 @@ window.updateStatus = function (value, aiText = null) {
     if (pm01Value) pm01Value.textContent = value.toLocaleString();
 
     // เพิ่มชุดสีส้มเข้าไป
-    if (!aiText) {
-        if (value >= 20000) aiText = "🚨 สูงมาก (แดง): ค่าฝุ่นสะสมระดับวิกฤต ควรงดเข้าพื้นที่ หรือสวมหน้ากากกรองอนุภาคขั้นสูงทันที";
-        else if (value >= 10000) aiText = "🟠 สูง (ส้ม): ค่าฝุ่นระดับสีส้มเริ่มส่งผลกระทบต่อสุขภาพ ควรเปิดเครื่องฟอกอากาศและหลีกเลี่ยงการอยู่ในพื้นที่นานเกินไป";
-        else if (value >= 1000) aiText = "🟡 ปานกลาง (เหลือง): เริ่มมีแนวโน้มกักเก็บฝุ่น ควรระบายอากาศหากทำได้";
-        else aiText = "🟢 ต่ำ (เขียว): ปลอดภัย ระดับอนุภาคฝุ่นอยู่ในเกณฑ์ดีเยี่ยม อากาศถ่ายเทได้ดี";
-    }
+    const allBgs = ['bg-[#5dbb47]', 'bg-[#f0b100]', 'bg-[#f97316]', 'bg-[#d93a3a]', 'bg-slate-300'];
+    const allLightBgs = ['bg-[#eef8eb]', 'bg-[#fef0b8]', 'bg-[#ffedd5]', 'bg-[#f8d7d7]', 'bg-slate-50'];
+    const allTexts = ['text-[#5dbb47]', 'text-[#f0b100]', 'text-[#f97316]', 'text-[#d93a3a]', 'text-slate-400', 'text-slate-500'];
 
     if (middleWrapper) middleWrapper.classList.remove(...allLightBgs);
     if (alertBoxBg) alertBoxBg.classList.remove(...allLightBgs);
