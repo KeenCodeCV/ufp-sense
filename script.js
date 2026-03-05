@@ -4,13 +4,13 @@
 setTimeout(() => {
     const loader = document.getElementById('loader-wrapper');
     if (loader) {
-        loader.style.opacity = '0'; 
+        loader.style.opacity = '0'; // เฟดให้จางลง
         setTimeout(() => {
-            loader.style.display = 'none'; 
-            loader.remove(); 
+            loader.style.display = 'none'; // ซ่อนออกจากหน้าจอให้คลิกทะลุได้
+            loader.remove(); // ลบออกจาก HTML
         }, 500);
     }
-}, 1500); 
+}, 1500); // แสดงหนูแฮมสเตอร์ 1.5 วินาที
 
 // ==========================================
 // 2. ระบบเวลา (Time Logic)
@@ -27,7 +27,7 @@ function updateTime() {
     }
 }
 setInterval(updateTime, 1000);
-setTimeout(updateTime, 100); 
+setTimeout(updateTime, 100); // รันครั้งแรกทันที
 
 // ==========================================
 // 3. ระบบจัดการสถานะ (Status & AI Logic)
@@ -47,14 +47,27 @@ window.updateStatus = function (value, aiText = null) {
 
     if (pm01Value) pm01Value.textContent = value.toLocaleString();
 
-    // 👉 ดักจับกรณีไม่มีข้อความ AI ส่งมา (เช่น ตอนกดปุ่ม Test System)
+    // 👉 เมื่อมีข้อมูลเข้ามา ให้เปลี่ยนปุ่ม Real-time เป็นสีเขียว
+    const realTimeIndicator = document.getElementById('realTimeIndicator');
+    const rtPing = document.getElementById('rtPing');
+    const rtDot = document.getElementById('rtDot');
+    
+    if (realTimeIndicator) {
+        realTimeIndicator.classList.remove('bg-red-50', 'text-red-500', 'border-red-100');
+        realTimeIndicator.classList.add('bg-green-50', 'text-green-600', 'border-green-100');
+    }
+    if (rtPing) rtPing.classList.replace('bg-red-400', 'bg-green-400');
+    if (rtDot) rtDot.classList.replace('bg-red-500', 'bg-green-500');
+
+    // 👉 ดักจับกรณีไม่มีข้อความ AI ส่งมา (ตอนกด Test System) ให้ใช้คำภาษาอังกฤษ
     if (!aiText) {
-        if (value >= 20000) aiText = "🚨 สูงมาก (แดง): ค่าฝุ่นสะสมระดับวิกฤต (PM0.1 > 20,000) ควรงดเข้าพื้นที่ หรือสวมหน้ากากกรองอนุภาคขั้นสูงทันที";
-        else if (value >= 10000) aiText = "🟠 สูง (ส้ม): ค่าฝุ่นระดับสีส้มเริ่มส่งผลกระทบต่อสุขภาพ ควรเปิดเครื่องฟอกอากาศและหลีกเลี่ยงการอยู่ในพื้นที่นานเกินไป";
-        else if (value >= 1000) aiText = "🟡 ปานกลาง (เหลือง): เริ่มมีแนวโน้มกักเก็บฝุ่น ควรระบายอากาศหากทำได้";
-        else aiText = "🟢 ต่ำ (เขียว): ปลอดภัย ระดับอนุภาคฝุ่นอยู่ในเกณฑ์ดีเยี่ยม อากาศถ่ายเทได้ดี";
+        if (value >= 20000) aiText = "Hazardous air conditions detected. Please remain indoors, keep all windows closed, and use high-efficiency air purifiers immediately.";
+        else if (value >= 10000) aiText = "Air quality is noticeably reduced. It is highly recommended to turn on air purifiers and minimize outdoor activities.";
+        else if (value >= 1000) aiText = "Air quality is acceptable. However, sensitive individuals should monitor for any discomfort and consider limiting prolonged outdoor exertion.";
+        else aiText = "The air quality is excellent. The environment is safe, making it a great time for normal activities and natural ventilation.";
     }
 
+    // เพิ่มชุดสีเข้าไป
     const allBgs = ['bg-[#5dbb47]', 'bg-[#f0b100]', 'bg-[#f97316]', 'bg-[#d93a3a]', 'bg-slate-300'];
     const allLightBgs = ['bg-[#eef8eb]', 'bg-[#fef0b8]', 'bg-[#ffedd5]', 'bg-[#f8d7d7]', 'bg-slate-50'];
     const allTexts = ['text-[#5dbb47]', 'text-[#f0b100]', 'text-[#f97316]', 'text-[#d93a3a]', 'text-slate-400', 'text-slate-500'];
@@ -67,7 +80,11 @@ window.updateStatus = function (value, aiText = null) {
     if (pm01StatusPill) pm01StatusPill.classList.remove(...allTexts, 'animate-pulse');
     if (pm01StatusText) pm01StatusText.classList.remove('text-blink');
 
+    // ===================================
+    // เงื่อนไข 4 ระดับ
+    // ===================================
     if (value < 1000) {
+        // === Safe (เขียว) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#eef8eb]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#eef8eb]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#5dbb47]');
@@ -79,8 +96,9 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-circle-check mr-2 text-lg';
         if (pm01StatusText) pm01StatusText.innerText = 'Status: Safe';
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#5dbb47] text-xl animate-bounce';
-        
+
     } else if (value >= 1000 && value < 10000) {
+        // === Moderate (เหลือง) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#fef0b8]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#fef0b8]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#f0b100]');
@@ -92,8 +110,9 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-triangle-exclamation mr-2 text-lg';
         if (pm01StatusText) pm01StatusText.innerText = 'Status: Moderate';
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f0b100] text-xl animate-bounce';
-        
+
     } else if (value >= 10000 && value < 20000) {
+        // === High (ส้ม) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#ffedd5]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#ffedd5]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#f97316]');
@@ -108,8 +127,9 @@ window.updateStatus = function (value, aiText = null) {
             pm01StatusText.classList.add('text-blink');
         }
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f97316] text-xl animate-bounce';
-        
+
     } else {
+        // === Danger (แดง) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#f8d7d7]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#f8d7d7]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#d93a3a]');
@@ -125,7 +145,8 @@ window.updateStatus = function (value, aiText = null) {
         }
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#d93a3a] text-xl animate-bounce';
     }
-
+    
+    // อัปเดตข้อความ AI
     if (suggestionText) suggestionText.textContent = aiText;
 }
 
@@ -181,6 +202,7 @@ window.updateCharts = function (arrCurrent, arrHour, arrDay) {
     if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Today'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });
 }
 
+// โหลดกราฟตั้งต้นตอนเปิดเว็บ
 setTimeout(() => {
     if (window.updateCharts) updateCharts([0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]);
 }, 200);
@@ -234,16 +256,17 @@ window.resetSystem = function () {
     const suggestionText = document.getElementById('suggestionText');
     const alertIcon = document.getElementById('alertIcon');
 
-    // 👉 ล็อกให้ Real-time คงความสีเขียวไว้
+    // 👉 คืนค่าปุ่ม Real-time กลับเป็นสีแดง (สถานะรอข้อมูล)
     const realTimeIndicator = document.getElementById('realTimeIndicator');
     const rtPing = document.getElementById('rtPing');
     const rtDot = document.getElementById('rtDot');
 
     if (realTimeIndicator) {
-        realTimeIndicator.className = 'bg-green-50 text-green-600 px-4 py-1.5 rounded-full text-[13px] font-bold flex items-center gap-2 border border-green-100 transition-colors duration-300';
+        realTimeIndicator.classList.remove('bg-green-50', 'text-green-600', 'border-green-100');
+        realTimeIndicator.classList.add('bg-red-50', 'text-red-500', 'border-red-100');
     }
-    if (rtPing) rtPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75';
-    if (rtDot) rtDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500';
+    if (rtPing) rtPing.classList.replace('bg-green-400', 'bg-red-400');
+    if (rtDot) rtDot.classList.replace('bg-green-500', 'bg-red-500');
 
     const allBgs = ['bg-[#5dbb47]', 'bg-[#f0b100]', 'bg-[#d93a3a]', 'bg-slate-300'];
     const allLightBgs = ['bg-[#eef8eb]', 'bg-[#fef0b8]', 'bg-[#f8d7d7]', 'bg-slate-50'];
@@ -259,31 +282,34 @@ window.resetSystem = function () {
     }
     if (iconBoxBg) {
         iconBoxBg.classList.remove(...allBgs);
-        iconBoxBg.classList.add('bg-slate-300'); 
+        iconBoxBg.classList.add('bg-slate-300'); // กล่องหน้าคนเป็นสีเทา
     }
     if (pm01Value) {
         pm01Value.innerText = '--';
         pm01Value.classList.remove(...allTexts);
-        pm01Value.classList.add('text-slate-400'); 
+        pm01Value.classList.add('text-slate-400'); // ตัวเลขเป็นสีเทา
     }
     if (pm01Unit) {
         pm01Unit.classList.remove(...allTexts);
-        pm01Unit.classList.add('text-slate-400'); 
+        pm01Unit.classList.add('text-slate-400'); // หน่วยเป็นสีเทา
     }
     if (pm01StatusPill) {
         pm01StatusPill.classList.remove(...allTexts);
-        pm01StatusPill.classList.add('text-slate-500'); 
+        pm01StatusPill.classList.add('text-slate-500'); // ป้ายสถานะเป็นสีเทา
     }
 
-    if (indoorIcon) indoorIcon.src = 'https://img5.pic.in.th/file/secure-sv1/Safe123.png'; 
+    if (indoorIcon) indoorIcon.src = 'https://img5.pic.in.th/file/secure-sv1/Safe123.png'; // กลับมาหน้ายิ้ม
     if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-spinner fa-spin mr-2 text-lg';
     if (pm01StatusText) {
         pm01StatusText.innerText = 'Status: Waiting...';
-        pm01StatusText.classList.remove('text-blink'); 
+        pm01StatusText.classList.remove('text-blink'); // เอากระพริบออก
     }
-    if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-slate-400 text-xl animate-bounce'; 
-    if (suggestionText) suggestionText.innerText = 'กำลังรอรับข้อมูลจากเซ็นเซอร์เพื่อทำการวิเคราะห์สภาพแวดล้อม...';
+    if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-slate-400 text-xl animate-bounce'; // หุ่นยนต์สีเทา
+    
+    // 👉 เปลี่ยนข้อความรอโหลดเป็นภาษาอังกฤษ
+    if (suggestionText) suggestionText.innerText = 'Waiting for sensor data to analyze the environmental conditions...';
 
+    // รีเซ็ตค่าการ์ดด้านนอก
     updateText('val-pm25', '--');
     updateText('val-temp', '--');
     updateText('val-humid', '--');

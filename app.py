@@ -106,18 +106,15 @@ def load_models():
 # ==========================================
 # [ส่วนฟังก์ชัน สร้าง AI Insight อัจฉริยะ]
 # ==========================================
-# ==========================================
-# [ส่วนฟังก์ชัน สร้าง AI Insight อัจฉริยะ]
-# ==========================================
 def generate_ai_insight(pm01, pm25, wind_speed, temp, humid):
     if pm01 >= 20000:
-        return f"🚨 สูงมาก (แดง): ค่าฝุ่นสะสมระดับวิกฤต (PM0.1 > 20,000) ควรงดเข้าพื้นที่ หรือสวมหน้ากากกรองอนุภาคขั้นสูงทันที"
+        return "Hazardous air conditions detected. Please remain indoors, keep all windows closed, and use high-efficiency air purifiers immediately."
     elif pm01 >= 10000:
-        return f"🟠 สูง (ส้ม): ค่าฝุ่นระดับสีส้มเริ่มส่งผลกระทบต่อสุขภาพ ควรเปิดเครื่องฟอกอากาศและหลีกเลี่ยงการอยู่ในพื้นที่นานเกินไป"
+        return "Air quality is noticeably reduced. It is highly recommended to turn on air purifiers and minimize outdoor activities."
     elif pm01 >= 1000:
-        return f"🟡 ปานกลาง (เหลือง): อุณหภูมิ {temp}°C และความชื้น {humid}% เริ่มมีแนวโน้มกักเก็บฝุ่น ควรระบายอากาศหากทำได้"
+        return "Air quality is acceptable. However, sensitive individuals should monitor for any discomfort and consider limiting prolonged outdoor exertion."
     else:
-        return f"🟢 ต่ำ (เขียว): ปลอดภัย ระดับอนุภาคฝุ่นอยู่ในเกณฑ์ดีเยี่ยม อากาศถ่ายเทได้ดี สภาพแวดล้อมเหมาะสำหรับการใช้ชีวิต"
+        return "The air quality is excellent. The environment is safe, making it a great time for normal activities and natural ventilation."
 
 # ==========================================
 # [ส่วนที่ 3: ฟังก์ชันอ่านไฟล์เว็บและ Inject ค่า]
