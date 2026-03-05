@@ -147,7 +147,7 @@ window.updateWindDirection = function (degree) {
 }
 
 // ==========================================
-// 5. ระบบกราฟ (Dynamic Chart.js)
+// 5. ระบบกราฟ (Dynamic Chart.js) (อัปเดตระบบเปลี่ยนสีตามค่าเฉลี่ย)
 // ==========================================
 let chartCurrentObj, chartHourObj, chartDayObj;
 const commonOptions = {
@@ -161,14 +161,28 @@ window.updateCharts = function (arrCurrent, arrHour, arrDay) {
     if (chartHourObj) chartHourObj.destroy();
     if (chartDayObj) chartDayObj.destroy();
 
+    // 1. คำนวณค่าเฉลี่ยของ Array กราฟชั่วโมง และ กราฟวัน
+    const avgHour = arrHour.reduce((a, b) => a + b, 0) / arrHour.length;
+    const avgDay = arrDay.reduce((a, b) => a + b, 0) / arrDay.length;
+
+    // 2. ตั้งเงื่อนไขเปลี่ยนสีกราฟ
+    // ถ้าเฉลี่ย 1 ชม. > 20,000 ให้เป็นสีแดง (Danger) นอกนั้นสีเขียว (Safe)
+    const colorHour = avgHour > 20000 ? '#d93a3a' : '#10b981';
+    const bgHour = avgHour > 20000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+
+    // ถ้าเฉลี่ย 24 ชม. > 10,000 ให้เป็นสีแดง (Danger) นอกนั้นสีเหลือง (Warning)
+    const colorDay = avgDay > 10000 ? '#d93a3a' : '#f59e0b';
+    const bgDay = avgDay > 10000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+
+    // 3. วาดกราฟ
     const ctx1 = document.getElementById('chartCurrent');
     if (ctx1) chartCurrentObj = new Chart(ctx1, { type: 'line', data: { labels: ['t-25', 't-20', 't-15', 't-10', 't-5', 'Live'], datasets: [{ data: arrCurrent, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, borderWidth: 2 }] }, options: commonOptions });
 
     const ctx2 = document.getElementById('chartHour');
-    if (ctx2) chartHourObj = new Chart(ctx2, { type: 'line', data: { labels: ['H-4', 'H-3', 'H-2', 'H-1', 'Now'], datasets: [{ data: arrHour, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, borderWidth: 2 }] }, options: commonOptions });
+    if (ctx2) chartHourObj = new Chart(ctx2, { type: 'line', data: { labels: ['H-4', 'H-3', 'H-2', 'H-1', 'Now'], datasets: [{ data: arrHour, borderColor: colorHour, backgroundColor: bgHour, fill: true, borderWidth: 2 }] }, options: commonOptions });
 
     const ctx3 = document.getElementById('chartDay');
-    if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Today'], datasets: [{ data: arrDay, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, borderWidth: 2 }] }, options: commonOptions });
+    if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Today'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });
 }
 
 // โหลดกราฟตั้งต้นตอนเปิดเว็บ
@@ -189,7 +203,8 @@ window.startTestMode = function () {
 }
 
 function simulateStep() {
-    const rPM01 = Math.floor(Math.random() * 15000);
+    // ปรับให้สุ่มค่า PM0.1 สูงสุดถึง 35,000 เพื่อให้กราฟทะลุลิมิตเปลี่ยนเป็นสีแดง
+    const rPM01 = Math.floor(Math.random() * 35000); 
     const rPM25 = (Math.random() * 50).toFixed(1);
     const rTemp = (25 + Math.random() * 10).toFixed(1);
     const rHumid = (50 + Math.random() * 30).toFixed(1);
