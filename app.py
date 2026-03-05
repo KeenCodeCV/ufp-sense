@@ -86,12 +86,16 @@ def load_models():
     except Exception as e: print(f"RNN Error: {e}")
 
     try:
-        name_lstm = "LSTM_fold_5_20251110_033855"
+        # อัปเดตชื่อไฟล์ LSTM และตั้งค่าพารามิเตอร์ใหม่
+        name_lstm = "lstm_Best_Model_20260305_044550"
         path_lstm = os.path.join(base_folder, f"{name_lstm}.pth")
         if os.path.exists(path_lstm):
             with open(os.path.join(base_folder, f"{name_lstm}_preprocessor.pkl"), 'rb') as f: prep_lstm = pickle.load(f)
             with open(os.path.join(base_folder, f"{name_lstm}_scaler.pkl"), 'rb') as f: y_scale_lstm = pickle.load(f)
-            model_lstm = SingleStepLSTM(input_size=7, hidden_size=254, num_layers=1)
+            
+            # โครงสร้างใหม่: input=8, hidden=64, layers=2
+            model_lstm = SingleStepLSTM(input_size=8, hidden_size=64, num_layers=2)
+            
             model_lstm.load_state_dict(torch.load(path_lstm, map_location=device), strict=False)
             model_lstm.to(device).eval()
             models['LSTM'] = (model_lstm, prep_lstm, y_scale_lstm)
@@ -195,18 +199,26 @@ uploaded_file = st.sidebar.file_uploader("📂 อัปโหลดไฟล์
 if uploaded_file is not None and selected_model_name in models:
     try:
         input_df = pd.read_csv(uploaded_file)
-        seq_len = 48
-        cols = ['Wind_Dir', 'Wind_Dir_Missing', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+        
+        # ปรับจาก 48 เป็น 18 ตามที่โมเดลใหม่ต้องการ
+        seq_len = 18 
+        
+        # อัปเดตคอลัมน์ให้ตรงกับ 8 ตัวที่เทรนมาเป๊ะๆ
+        cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
         
         if len(input_df) >= seq_len:
+            # ดึงเฉพาะ 8 คอลัมน์ที่โมเดลต้องใช้
             input_data = input_df[cols].tail(seq_len)
             
+            # ดึงค่าแถวสุดท้ายมาแสดงผลบนหน้าเว็บ
             last_row = input_df.iloc[-1]
             pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
             temp_disp = round(last_row['Outdoor_Temperature'], 2)
             humid_disp = round(last_row['Outdoor_Humidity'], 2)
-            wind_disp = round(last_row['Wind_Dir'], 2) 
-            wind_spd = round(last_row['Wind_Speed'], 2) # ดึงค่าความเร็วลมไปวิเคราะห์ AI
+            wind_spd = round(last_row['Wind_Speed'], 2)
+            
+            # เช็คว่ามีคอลัมน์ Wind_Dir (องศาลม) ใน CSV ไหม ถ้ามีก็ดึงมาหมุนเข็มทิศหน้าเว็บ ถ้าไม่มีให้เป็น 0
+            wind_disp = round(last_row['Wind_Dir'], 2) if 'Wind_Dir' in input_df.columns else 0
 
             model, prep, y_scaler = models[selected_model_name]
             
@@ -218,20 +230,10 @@ if uploaded_file is not None and selected_model_name in models:
             
             pred_val = int(y_scaler.inverse_transform(pred_scaled.cpu().numpy())[0][0])
             
-            # ส่งค่าทั้งหมดรวมถึง wind_spd ไปด้วย
             html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, selected_model_name)
             components.html(html_content, height=1100, scrolling=True)
             
         else:
-            st.error(f"ข้อมูลไม่เพียงพอ! ต้องการอย่างน้อย {seq_len} แถว")
+            st.error(f"ข้อมูลไม่เพียงพอ! ต้องการอย่างน้อย {seq_len} แถว (ปัจจุบันมี {len(input_df)} แถว)")
     except Exception as e:
-        st.error(f"เกิดข้อผิดพลาด: {e}")
-else:
-    if uploaded_file is None:
-        st.info("👈 กรุณาอัปโหลดไฟล์ CSV ทางด้านซ้ายเพื่อเริ่มการทำนาย")
-        try:
-            # เพิ่ม 0 สำหรับ parameter wind_speed ที่เพิ่มมาใหม่
-            html_content = render_web_interface(0, 0, 0, 0, 0, 0, "No Model")
-            components.html(html_content, height=1100, scrolling=True)
-        except:
-            pass
+        st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
