@@ -200,13 +200,26 @@ if uploaded_file is not None and selected_model_name in models:
     try:
         input_df = pd.read_csv(uploaded_file)
         
+        # ========================================================
+        # [เพิ่มใหม่] คำนวณ Wind_Dir_cos และ Wind_Dir_sin อัตโนมัติ
+        # ========================================================
+        if 'Wind_Dir' in input_df.columns:
+            # แปลงองศา (Degrees) เป็นเรเดียน (Radians) แล้วหาค่า cos/sin
+            input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
+            input_df['Wind_Dir_sin'] = np.sin(np.radians(input_df['Wind_Dir']))
+        
         # ปรับจาก 48 เป็น 18 ตามที่โมเดลใหม่ต้องการ
         seq_len = 18 
         
-        # อัปเดตคอลัมน์ให้ตรงกับ 8 ตัวที่เทรนมาเป๊ะๆ
+        # คอลัมน์ที่ AI ต้องใช้ (ตอนนี้ input_df มี cos/sin ครบแล้วเพราะเราเพิ่งสร้างให้บรรทัดบน)
         cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
         
-        if len(input_df) >= seq_len:
+        # เช็คก่อนว่าไฟล์ที่อัปโหลดมา มีคอลัมน์ครบตามที่เราต้องการไหม
+        missing_cols = [c for c in cols if c not in input_df.columns]
+        
+        if missing_cols:
+             st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์: {', '.join(missing_cols)}")
+        elif len(input_df) >= seq_len:
             # ดึงเฉพาะ 8 คอลัมน์ที่โมเดลต้องใช้
             input_data = input_df[cols].tail(seq_len)
             
@@ -217,7 +230,7 @@ if uploaded_file is not None and selected_model_name in models:
             humid_disp = round(last_row['Outdoor_Humidity'], 2)
             wind_spd = round(last_row['Wind_Speed'], 2)
             
-            # เช็คว่ามีคอลัมน์ Wind_Dir (องศาลม) ใน CSV ไหม ถ้ามีก็ดึงมาหมุนเข็มทิศหน้าเว็บ ถ้าไม่มีให้เป็น 0
+            # ดึงค่าองศาลมมาหมุนเข็มทิศ
             wind_disp = round(last_row['Wind_Dir'], 2) if 'Wind_Dir' in input_df.columns else 0
 
             model, prep, y_scaler = models[selected_model_name]
