@@ -14,6 +14,18 @@ st.set_page_config(
     page_icon="https://img5.pic.in.th/file/secure-sv1/706507857101af6d43e9fafd62b35bc6.png",                     # ใส่เป็น Emoji หรือ ใส่ลิงก์รูปก็ได้
     layout="wide"                      # ให้เว็บแสดงผลเต็มจอซ้ายขวา
 )
+
+
+components.html(
+    """
+    <script>
+        // บังคับเปลี่ยนชื่อ Title ของหน้าต่างหลักให้เป็นชื่อที่เราต้องการเท่านั้น
+        window.parent.document.title = 'UFP SENSE Dashboard';
+    </script>
+    """,
+    height=0,
+    width=0,
+)
 # ==========================================
 # [ส่วนที่ 1: คลาสโมเดล]
 # ==========================================
