@@ -19,17 +19,26 @@ st.set_page_config(
 components.html(
     """
     <script>
-        const targetTitle = 'UFP SENSE Dashboard'; // ชื่อที่คุณต้องการ
+        const targetTitle = 'UFP SENSE Dashboard';
         
-        // 1. เปลี่ยนทันทีที่โหลด
-        window.parent.document.title = targetTitle;
+        // แอบเข้าไปหาแท็ก <title> ในหน้าต่างหลัก
+        const titleEl = window.parent.document.querySelector('title');
         
-        // 2. ตั้งเวลาดักตบ! ถ้า Streamlit แอบเปลี่ยน ให้เปลี่ยนกลับทันที (เช็คทุก 100 มิลลิวินาที)
-        setInterval(function() {
-            if (window.parent.document.title !== targetTitle) {
-                window.parent.document.title = targetTitle;
-            }
-        }, 100);
+        if (titleEl) {
+            // 1. ตบเปลี่ยนชื่อทันทีที่โหลดเสร็จ
+            titleEl.innerText = targetTitle;
+            
+            // 2. ตั้งยามเฝ้าดู (MutationObserver) 
+            // ถ้า Streamlit แอบเปลี่ยนเนื้อหาข้างใน tag <title> จะเปลี่ยนกลับทันที!
+            const observer = new MutationObserver(() => {
+                if (titleEl.innerText !== targetTitle) {
+                    titleEl.innerText = targetTitle;
+                }
+            });
+            
+            // 3. สั่งให้ยามเริ่มทำงานแบบตาไม่กะพริบ
+            observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+        }
     </script>
     """,
     height=0,
