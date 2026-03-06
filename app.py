@@ -19,8 +19,17 @@ st.set_page_config(
 components.html(
     """
     <script>
-        // บังคับเปลี่ยนชื่อ Title ของหน้าต่างหลักให้เป็นชื่อที่เราต้องการเท่านั้น
-        window.parent.document.title = 'UFP SENSE Dashboard';
+        const targetTitle = 'UFP SENSE Dashboard'; // ชื่อที่คุณต้องการ
+        
+        // 1. เปลี่ยนทันทีที่โหลด
+        window.parent.document.title = targetTitle;
+        
+        // 2. ตั้งเวลาดักตบ! ถ้า Streamlit แอบเปลี่ยน ให้เปลี่ยนกลับทันที (เช็คทุก 100 มิลลิวินาที)
+        setInterval(function() {
+            if (window.parent.document.title !== targetTitle) {
+                window.parent.document.title = targetTitle;
+            }
+        }, 100);
     </script>
     """,
     height=0,
