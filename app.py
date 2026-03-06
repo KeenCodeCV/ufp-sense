@@ -259,6 +259,7 @@ else:
         pass 
         try:
             # ส่งค่า 0 ไปให้ครบ 6 ค่าตามฟังก์ชันใหม่ที่อัปเดตไป
+            st.markdown("<br><br>", unsafe_allow_html=True)
             html_content = render_web_interface(0, 0, 0, 0, 0, 0, "No Model")
             components.html(html_content, height=1100, scrolling=True)
         except:
