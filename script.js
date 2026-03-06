@@ -80,11 +80,11 @@ window.updateStatus = function (value, aiText = null) {
     if (pm01StatusPill) pm01StatusPill.classList.remove(...allTexts, 'animate-pulse');
     if (pm01StatusText) pm01StatusText.classList.remove('text-blink');
 
+// ===================================
+    // เงื่อนไข 4 ระดับ (อัปเดตเกณฑ์ใหม่ล่าสุด!)
     // ===================================
-    // เงื่อนไข 4 ระดับ
-    // ===================================
-    if (value < 1000) {
-        // === Safe (เขียว) ===
+    if (value <= 999) {
+        // === Safe (เขียว: <= 999) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#eef8eb]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#eef8eb]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#5dbb47]');
@@ -97,8 +97,8 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01StatusText) pm01StatusText.innerText = 'Status: Safe';
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#5dbb47] text-xl animate-bounce';
 
-    } else if (value >= 1000 && value < 10000) {
-        // === Moderate (เหลือง) ===
+    } else if (value >= 1000 && value <= 9999) {
+        // === Moderate (เหลือง: 1,000 - 9,999) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#fef0b8]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#fef0b8]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#f0b100]');
@@ -111,8 +111,8 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01StatusText) pm01StatusText.innerText = 'Status: Moderate';
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f0b100] text-xl animate-bounce';
 
-    } else if (value >= 10000 && value < 20000) {
-        // === High (ส้ม) ===
+    } else if (value >= 10000 && value <= 19999) {
+        // === High (ส้ม: 10,000 - 19,999) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#ffedd5]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#ffedd5]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#f97316]');
@@ -129,7 +129,7 @@ window.updateStatus = function (value, aiText = null) {
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f97316] text-xl animate-bounce';
 
     } else {
-        // === Danger (แดง) ===
+        // === Danger (แดง: 20,000 ขึ้นไป) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#f8d7d7]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#f8d7d7]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#d93a3a]');

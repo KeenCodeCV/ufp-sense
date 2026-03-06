@@ -144,12 +144,19 @@ def load_models():
 # [ส่วนฟังก์ชัน สร้าง AI Insight อัจฉริยะ]
 # ==========================================
 def generate_ai_insight(pm01, pm25, wind_speed, temp, humid):
+    # === Danger (แดง: 20,000 ขึ้นไป) ===
     if pm01 >= 20000:
         return "Hazardous air conditions detected. Please remain indoors, keep all windows closed, and use high-efficiency air purifiers immediately."
+    
+    # === High (ส้ม: 10,000 - 19,999) ===
     elif pm01 >= 10000:
         return "Air quality is noticeably reduced. It is highly recommended to turn on air purifiers and minimize outdoor activities."
-    elif pm01 >= 1000:
+    
+    # === Moderate (เหลือง: 1,000 - 9,999) ===
+    elif pm01 >= 1000: # ✅ แก้เป็น >= 1000 แล้วครับ
         return "Air quality is acceptable. However, sensitive individuals should monitor for any discomfort and consider limiting prolonged outdoor exertion."
+    
+    # === Safe (เขียว: น้อยกว่าหรือเท่ากับ 999) ===
     else:
         return "The air quality is excellent. The environment is safe, making it a great time for normal activities and natural ventilation."
 
