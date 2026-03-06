@@ -178,7 +178,7 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
 # ==========================================
 # [ส่วนที่ 4: Streamlit UI]
 # ==========================================
-st.set_page_config(layout="wide", page_title="WFP SENSE Dashboard", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="UFP SENSE Dashboard", initial_sidebar_state="expanded")
 
 st.markdown("""
     <style>
