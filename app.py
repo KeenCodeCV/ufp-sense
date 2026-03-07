@@ -237,11 +237,12 @@ selected_model_name = st.sidebar.selectbox("เลือกโมเดล (Mode
 uploaded_file = st.sidebar.file_uploader("📂 อัปโหลดไฟล์ CSV (Data Input)", type=["csv"])
 
 # เช็คเงื่อนไขการแสดงผลเว็บ
+# เช็คเงื่อนไขการแสดงผลเว็บ
 if uploaded_file is not None:
-    # กรณีที่มีไฟล์อัปโหลดเข้ามา ต้องเช็คก่อนว่าโมเดลที่เลือกโหลดสำเร็จไหม
     if selected_model_name in models:
         try:
             input_df = pd.read_csv(uploaded_file)
+            original_cols = input_df.columns.tolist() # เก็บชื่อคอลัมน์เดิมไว้
             
             if 'Wind_Dir' in input_df.columns:
                 input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
@@ -254,14 +255,62 @@ if uploaded_file is not None:
             
             if missing_cols:
                  st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์: {', '.join(missing_cols)}")
-                 
-                 # แสดงหน้าเว็บเปล่าๆ เพื่อไม่ให้จอดำ
                  st.markdown("<br><br>", unsafe_allow_html=True)
                  components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
                  
             elif len(input_df) >= seq_len:
-                input_data = input_df[cols].tail(seq_len)
+                # ---------------------------------------------------------
+                # 1. ระบบกวาดทำนายผล (Batch Prediction) สำหรับทุกแถวในไฟล์
+                # ---------------------------------------------------------
+                X_processed_all = prep.transform(input_df[cols])
                 
+                sequences = []
+                # สไลด์ข้อมูลทีละ seq_len แถว เพื่อสร้างชุดคำถามทั้งหมด
+                for i in range(len(X_processed_all) - seq_len + 1):
+                    sequences.append(X_processed_all[i : i + seq_len])
+                
+                seq_tensor = torch.FloatTensor(np.array(sequences)).to(device)
+                
+                preds_list = []
+                chunk_size = 256 # แบ่งทำนายทีละ 256 ชุด ป้องกันคอมค้าง
+                model.eval()
+                with torch.no_grad():
+                    for i in range(0, len(seq_tensor), chunk_size):
+                        chunk = seq_tensor[i:i+chunk_size]
+                        out = model(chunk)
+                        preds_list.append(out.cpu().numpy())
+                
+                if preds_list:
+                    preds_scaled = np.vstack(preds_list)
+                    raw_preds = y_scaler.inverse_transform(preds_scaled)
+                    # หาร 1000 เพื่อแปลงหน่วย PC/L เป็น PC/cm³
+                    preds_final = (raw_preds / 1000).flatten().astype(int)
+                else:
+                    preds_final = []
+                
+                # แถวแรกๆ ที่ข้อมูลไม่ครบ seq_len จะถูกใส่เป็นค่าว่าง (None)
+                full_predictions = [None] * (seq_len - 1) + preds_final.tolist()
+                
+                # ---------------------------------------------------------
+                # 2. สร้างไฟล์ใหม่สำหรับดาวน์โหลด และแสดงปุ่ม
+                # ---------------------------------------------------------
+                download_df = input_df[original_cols].copy() # เอาเฉพาะคอลัมน์เดิมที่อัปโหลดมา
+                download_df['Predict Indoor_PC0.1'] = full_predictions # เพิ่มคอลัมน์ผลทำนาย
+                
+                csv_data = download_df.to_csv(index=False).encode('utf-8-sig') # ใช้ utf-8-sig ป้องกันภาษาไทยเพี้ยน
+                
+                st.sidebar.markdown("---")
+                st.sidebar.success("✅ ประมวลผลเสร็จสิ้น!")
+                st.sidebar.download_button(
+                    label="📥 ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
+                    data=csv_data,
+                    file_name=f"predicted_{selected_model_name}_{uploaded_file.name}",
+                    mime="text/csv",
+                )
+
+                # ---------------------------------------------------------
+                # 3. นำค่าที่ทำนายได้ "แถวสุดท้าย" ไปแสดงบน Dashboard
+                # ---------------------------------------------------------
                 last_row = input_df.iloc[-1]
                 pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
                 temp_disp = round(last_row['Outdoor_Temperature'], 2)
@@ -269,14 +318,7 @@ if uploaded_file is not None:
                 wind_spd = round(last_row['Wind_Speed'], 2)
                 wind_disp = round(last_row['Wind_Dir'], 2) if 'Wind_Dir' in input_df.columns else 0
 
-                X_processed = prep.transform(input_data)
-                input_tensor = torch.FloatTensor(X_processed).unsqueeze(0).to(device)
-                
-                with torch.no_grad():
-                    pred_scaled = model(input_tensor)
-                
-                raw_pred_val = int(y_scaler.inverse_transform(pred_scaled.cpu().numpy())[0][0])
-                pred_val = int(raw_pred_val / 1000)
+                pred_val = int(preds_final[-1]) if len(preds_final) > 0 else 0
                 
                 html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, selected_model_name)
                 components.html(html_content, height=1100, scrolling=True)
@@ -291,12 +333,10 @@ if uploaded_file is not None:
             st.markdown("<br><br>", unsafe_allow_html=True)
             components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
     else:
-        # กรณีโมเดลตัวนั้นโหลดไม่ขึ้น (ไฟล์หาย / โหลดพัง)
         st.error(f"❌ ไม่สามารถใช้งานโมเดล '{selected_model_name}' ได้ กรุณาตรวจสอบไฟล์ในโฟลเดอร์ 'models'")
         st.markdown("<br><br>", unsafe_allow_html=True)
         components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
 else:
-    # กรณีเพิ่งเปิดเว็บ ยังไม่ได้อัปโหลดไฟล์
     st.markdown("<br><br>", unsafe_allow_html=True)
     html_content = render_web_interface(0, 0, 0, 0, 0, 0, "No Model")
     components.html(html_content, height=1100, scrolling=True)
