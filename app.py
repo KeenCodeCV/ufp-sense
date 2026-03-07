@@ -89,6 +89,10 @@ def load_models():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     base_folder = "models"
     
+    if not os.path.exists(base_folder):
+        st.error(f"❌ ไม่พบโฟลเดอร์ '{base_folder}' ในระบบ โปรดสร้างโฟลเดอร์และใส่ไฟล์โมเดล")
+        return models, device
+
     # --- 1. โหลด GRU (Seq=48) ---
     try:
         name_gru = "gru_Best_Model_20260306_181208"
@@ -101,7 +105,9 @@ def load_models():
             model_gru.load_state_dict(torch.load(path_gru, map_location=device), strict=False)
             model_gru.to(device).eval()
             models['GRU'] = (model_gru, prep_gru, y_scale_gru, 48)
-    except Exception as e: print(f"GRU Error: {e}")
+        else:
+            st.warning(f"⚠️ หาไฟล์ GRU ไม่พบ: {path_gru}")
+    except Exception as e: st.error(f"GRU Error: {e}")
 
     # --- 2. โหลด RNN (Seq=24) ---
     try:
@@ -115,11 +121,14 @@ def load_models():
             model_rnn.load_state_dict(torch.load(path_rnn, map_location=device), strict=False)
             model_rnn.to(device).eval()
             models['RNN'] = (model_rnn, prep_rnn, y_scale_rnn, 24)
-    except Exception as e: print(f"RNN Error: {e}")
+        else:
+            st.warning(f"⚠️ หาไฟล์ RNN ไม่พบ: {path_rnn}")
+    except Exception as e: st.error(f"RNN Error: {e}")
 
     # --- 3. โหลด LSTM (Seq=42) ---
     try:
-        name_lstm = "lstm_Best_Model_20260307_004450"
+        # ✅ แก้ไขชื่อไฟล์ LSTM ให้ตรงกับไฟล์จริงๆ ของคุณแล้ว
+        name_lstm = "lstm_Best_Model_20260306_235311" 
         path_lstm = os.path.join(base_folder, f"{name_lstm}.pth")
         if os.path.exists(path_lstm):
             with open(os.path.join(base_folder, f"{name_lstm}_preprocessor.pkl"), 'rb') as f: prep_lstm = pickle.load(f)
@@ -129,7 +138,9 @@ def load_models():
             model_lstm.load_state_dict(torch.load(path_lstm, map_location=device), strict=False)
             model_lstm.to(device).eval()
             models['LSTM'] = (model_lstm, prep_lstm, y_scale_lstm, 42)
-    except Exception as e: print(f"LSTM Error: {e}")
+        else:
+            st.warning(f"⚠️ หาไฟล์ LSTM ไม่พบ: {path_lstm}")
+    except Exception as e: st.error(f"LSTM Error: {e}")
     
     return models, device
 
@@ -155,7 +166,7 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
         with open("style.css", "r", encoding="utf-8") as f: css_content = f.read()
         with open("script.js", "r", encoding="utf-8") as f: js_content = f.read()
     except FileNotFoundError:
-        return "<h3 style='color:red;'>Error: ไม่พบไฟล์ index.html, style.css หรือ script.js</h3>"
+        return "<h3 style='color:red; text-align:center;'>Error: ไม่พบไฟล์ index.html, style.css หรือ script.js</h3>"
 
     if model_name == "No Model":
         injection_script = f"<script>{js_content}\n setTimeout(function() {{ if(window.resetSystem) window.resetSystem(); }}, 500);</script>"
@@ -208,60 +219,72 @@ models, device = load_models()
 
 st.sidebar.title("⚡ Control Panel")
 if not models:
-    st.sidebar.error("❌ ไม่พบโมเดลสักตัว! กรุณาตรวจสอบการตั้งค่าไฟล์ในโฟลเดอร์ models")
+    st.sidebar.error("❌ ไม่พบโมเดลสักตัว! กรุณาตรวจสอบโฟลเดอร์ 'models' ว่ามีไฟล์ครบหรือไม่")
 
 selected_model_name = st.sidebar.selectbox("เลือกโมเดล (Model)", ["LSTM", "GRU", "RNN"], index=0)
 uploaded_file = st.sidebar.file_uploader("📂 อัปโหลดไฟล์ CSV (Data Input)", type=["csv"])
 
-if uploaded_file is not None and selected_model_name in models:
-    try:
-        input_df = pd.read_csv(uploaded_file)
-        
-        if 'Wind_Dir' in input_df.columns:
-            input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
-            input_df['Wind_Dir_sin'] = np.sin(np.radians(input_df['Wind_Dir']))
-        
-        # ✅ ระบบดึง Sequence Length ของแต่ละโมเดลอัตโนมัติ (48, 42, 24)
-        model, prep, y_scaler, seq_len = models[selected_model_name]
-        
-        cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
-        missing_cols = [c for c in cols if c not in input_df.columns]
-        
-        if missing_cols:
-             st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์: {', '.join(missing_cols)}")
-        elif len(input_df) >= seq_len:
-            input_data = input_df[cols].tail(seq_len)
-            
-            last_row = input_df.iloc[-1]
-            pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
-            temp_disp = round(last_row['Outdoor_Temperature'], 2)
-            humid_disp = round(last_row['Outdoor_Humidity'], 2)
-            wind_spd = round(last_row['Wind_Speed'], 2)
-            wind_disp = round(last_row['Wind_Dir'], 2) if 'Wind_Dir' in input_df.columns else 0
-
-            X_processed = prep.transform(input_data)
-            input_tensor = torch.FloatTensor(X_processed).unsqueeze(0).to(device)
-            
-            with torch.no_grad():
-                pred_scaled = model(input_tensor)
-            
-            raw_pred_val = int(y_scaler.inverse_transform(pred_scaled.cpu().numpy())[0][0])
-            pred_val = int(raw_pred_val / 1000)
-            
-            html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, selected_model_name)
-            components.html(html_content, height=1100, scrolling=True)
-            
-        else:
-            st.error(f"ข้อมูลไม่เพียงพอ! โมเดล {selected_model_name} ต้องการอย่างน้อย {seq_len} แถว (ปัจจุบันอัปโหลดมา {len(input_df)} แถว)")
-    except Exception as e:
-        st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
-        
-else:
-    if uploaded_file is None:
-        pass 
+# เช็คเงื่อนไขการแสดงผลเว็บ
+if uploaded_file is not None:
+    # กรณีที่มีไฟล์อัปโหลดเข้ามา ต้องเช็คก่อนว่าโมเดลที่เลือกโหลดสำเร็จไหม
+    if selected_model_name in models:
         try:
+            input_df = pd.read_csv(uploaded_file)
+            
+            if 'Wind_Dir' in input_df.columns:
+                input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
+                input_df['Wind_Dir_sin'] = np.sin(np.radians(input_df['Wind_Dir']))
+            
+            model, prep, y_scaler, seq_len = models[selected_model_name]
+            
+            cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
+            missing_cols = [c for c in cols if c not in input_df.columns]
+            
+            if missing_cols:
+                 st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์: {', '.join(missing_cols)}")
+                 
+                 # แสดงหน้าเว็บเปล่าๆ เพื่อไม่ให้จอดำ
+                 st.markdown("<br><br>", unsafe_allow_html=True)
+                 components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
+                 
+            elif len(input_df) >= seq_len:
+                input_data = input_df[cols].tail(seq_len)
+                
+                last_row = input_df.iloc[-1]
+                pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
+                temp_disp = round(last_row['Outdoor_Temperature'], 2)
+                humid_disp = round(last_row['Outdoor_Humidity'], 2)
+                wind_spd = round(last_row['Wind_Speed'], 2)
+                wind_disp = round(last_row['Wind_Dir'], 2) if 'Wind_Dir' in input_df.columns else 0
+
+                X_processed = prep.transform(input_data)
+                input_tensor = torch.FloatTensor(X_processed).unsqueeze(0).to(device)
+                
+                with torch.no_grad():
+                    pred_scaled = model(input_tensor)
+                
+                raw_pred_val = int(y_scaler.inverse_transform(pred_scaled.cpu().numpy())[0][0])
+                pred_val = int(raw_pred_val / 1000)
+                
+                html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, selected_model_name)
+                components.html(html_content, height=1100, scrolling=True)
+                
+            else:
+                st.error(f"ข้อมูลไม่เพียงพอ! โมเดล {selected_model_name} ต้องการอย่างน้อย {seq_len} แถว (ปัจจุบันอัปโหลดมา {len(input_df)} แถว)")
+                st.markdown("<br><br>", unsafe_allow_html=True)
+                components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
+                
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์หรือประมวลผล: {e}")
             st.markdown("<br><br>", unsafe_allow_html=True)
-            html_content = render_web_interface(0, 0, 0, 0, 0, 0, "No Model")
-            components.html(html_content, height=1100, scrolling=True)
-        except:
-            pass
+            components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
+    else:
+        # กรณีโมเดลตัวนั้นโหลดไม่ขึ้น (ไฟล์หาย / โหลดพัง)
+        st.error(f"❌ ไม่สามารถใช้งานโมเดล '{selected_model_name}' ได้ กรุณาตรวจสอบไฟล์ในโฟลเดอร์ 'models'")
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
+else:
+    # กรณีเพิ่งเปิดเว็บ ยังไม่ได้อัปโหลดไฟล์
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    html_content = render_web_interface(0, 0, 0, 0, 0, 0, "No Model")
+    components.html(html_content, height=1100, scrolling=True)
