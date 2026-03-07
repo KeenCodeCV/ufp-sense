@@ -13,9 +13,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# ==========================================
-# [วิชามาร: จ้างยามเฝ้าเปลี่ยนชื่อ Title ลบคำว่า Streamlit]
-# ==========================================
 components.html(
     """
     <script>
@@ -81,7 +78,7 @@ class SingleStepLSTM(nn.Module):
         return out
 
 # ==========================================
-# [ส่วนที่ 2: ฟังก์ชันโหลดโมเดล (อัปเดตสเปคล่าสุด)]
+# [ส่วนที่ 2: ฟังก์ชันโหลดโมเดล]
 # ==========================================
 @st.cache_resource
 def load_models():
@@ -93,27 +90,24 @@ def load_models():
         st.error(f"❌ ไม่พบโฟลเดอร์ '{base_folder}' ในระบบ โปรดสร้างโฟลเดอร์และใส่ไฟล์โมเดล")
         return models, device
 
-    # --- 1. โหลด GRU (Seq=12) อัปเดตไฟล์ใหม่ ---
+    # --- 1. โหลด GRU (Seq=12, Features=6) ---
     try:
-        # ✅ อัปเดตชื่อไฟล์เป็น gru_latest
         name_gru = "gru_latest"
         path_gru = os.path.join(base_folder, f"{name_gru}.pth")
         if os.path.exists(path_gru):
             with open(os.path.join(base_folder, f"{name_gru}_preprocessor.pkl"), 'rb') as f: prep_gru = pickle.load(f)
             with open(os.path.join(base_folder, f"{name_gru}_scaler.pkl"), 'rb') as f: y_scale_gru = pickle.load(f)
             
-            # ✅ สเปคใหม่ของ GRU
-            model_gru = SingleStepGRU(input_size=8, hidden_size=8, num_layers=1)
+            # ✅ แก้ไข input_size เป็น 6 ตามโมเดลตัวใหม่
+            model_gru = SingleStepGRU(input_size=6, hidden_size=8, num_layers=1)
             model_gru.load_state_dict(torch.load(path_gru, map_location=device), strict=False)
             model_gru.to(device).eval()
-            
-            # ✅ ปรับ Seq เป็น 12
             models['GRU'] = (model_gru, prep_gru, y_scale_gru, 12)
         else:
             st.warning(f"⚠️ หาไฟล์ GRU ไม่พบ: {path_gru}")
     except Exception as e: st.error(f"GRU Error: {e}")
 
-    # --- 2. โหลด RNN (Seq=24) ---
+    # --- 2. โหลด RNN (Seq=24, Features=8) ---
     try:
         name_rnn = "rnn_Best_Model_20260306_164237"
         path_rnn = os.path.join(base_folder, f"{name_rnn}.pth")
@@ -129,7 +123,7 @@ def load_models():
             st.warning(f"⚠️ หาไฟล์ RNN ไม่พบ: {path_rnn}")
     except Exception as e: st.error(f"RNN Error: {e}")
 
-    # --- 3. โหลด LSTM (Seq=42) ---
+    # --- 3. โหลด LSTM (Seq=42, Features=8) ---
     try:
         name_lstm = "lstm_Best_Model_20260306_235311" 
         path_lstm = os.path.join(base_folder, f"{name_lstm}.pth")
@@ -211,21 +205,12 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
 # ==========================================
 st.markdown("""
     <style>
-        /* ดันขอบจอให้ชิดขึ้น */
         .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
-        
-        /* 1. ซ่อนเมนู Streamlit และ Footer ด้านล่าง */
         #MainMenu {visibility: hidden;} 
         footer {visibility: hidden;}
-        
-        /* 2. ซ่อนปุ่ม Deploy (มุมบนขวา) */
         [data-testid="stAppDeployButton"] {display: none !important;}
-        
-        /* 3. 🥷 ซ่อนปุ่มลอยๆ มุมขวาล่าง (ลายน้ำ Streamlit / Manage App) */
         .viewerBadge_container {display: none !important;}
         .viewerBadge_link {display: none !important;}
-        
-        /* ปรับแต่งกล่องแจ้งเตือน (Alert) */
         div[data-testid="stAlert"] { margin-top: -15px !important; padding: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -239,43 +224,43 @@ if not models:
 selected_model_name = st.sidebar.selectbox("เลือกโมเดล (Model)", ["LSTM", "GRU", "RNN"], index=0)
 uploaded_file = st.sidebar.file_uploader("📂 อัปโหลดไฟล์ CSV (Data Input)", type=["csv"])
 
-# เช็คเงื่อนไขการแสดงผลเว็บ
-# เช็คเงื่อนไขการแสดงผลเว็บ
 if uploaded_file is not None:
     if selected_model_name in models:
         try:
             input_df = pd.read_csv(uploaded_file)
             original_cols = input_df.columns.tolist() 
             
+            # เตรียมคอลัมน์ cos/sin ล่วงหน้าสำหรับ LSTM/RNN ที่ต้องใช้
             if 'Wind_Dir' in input_df.columns:
                 input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
                 input_df['Wind_Dir_sin'] = np.sin(np.radians(input_df['Wind_Dir']))
             
-            # โหลดสเปคของโมเดลที่ผู้ใช้เลือกสำหรับแสดงผลบน Dashboard
-            model, prep, y_scaler, seq_len = models[selected_model_name]
-            
-            cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
-            missing_cols = [c for c in cols if c not in input_df.columns]
+            # เช็คว่าไฟล์มีคอลัมน์พื้นฐานครบไหม
+            base_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
+            missing_cols = [c for c in base_cols if c not in input_df.columns]
             
             if missing_cols:
-                 st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์: {', '.join(missing_cols)}")
+                 st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์พื้นฐาน: {', '.join(missing_cols)}")
                  st.markdown("<br><br>", unsafe_allow_html=True)
                  components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
                  
-            elif len(input_df) >= seq_len:
-                # ---------------------------------------------------------
-                # 1. ระบบกวาดทำนายผล (Batch Prediction) สำหรับ "ทั้ง 3 โมเดล"
-                # ---------------------------------------------------------
+            else:
                 download_df = input_df[original_cols].copy() 
                 
-                # วนลูปทำนายให้ครบทุกโมเดลที่มีในระบบ
+                # วนลูปทำนายให้ครบทุกโมเดล
                 for m_name in ["LSTM", "GRU", "RNN"]:
                     if m_name in models:
                         mod_i, prep_i, y_scaler_i, seq_len_i = models[m_name]
                         
-                        # เช็คว่าข้อมูลในไฟล์ยาวพอสำหรับโมเดลนี้ไหม
+                        # ✅ เลือกว่าโมเดลไหนใช้กี่คอลัมน์ (GRU ใช้ 6, LSTM/RNN ใช้ 8)
+                        if m_name == "GRU":
+                            model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+                        else:
+                            model_cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
+                        
                         if len(input_df) >= seq_len_i:
-                            X_proc_all = prep_i.transform(input_df[cols])
+                            # ป้อนข้อมูลเข้า AI เฉพาะคอลัมน์ที่มันรู้จัก
+                            X_proc_all = prep_i.transform(input_df[model_cols])
                             
                             sequences = []
                             for i in range(len(X_proc_all) - seq_len_i + 1):
@@ -299,18 +284,12 @@ if uploaded_file is not None:
                             else:
                                 preds_final = np.array([])
                             
-                            # เติมค่า None ในแถวแรกๆ ที่ข้อมูลไม่ครบ Seq_len ของแต่ละโมเดล
                             full_predictions = [None] * (seq_len_i - 1) + preds_final.tolist()
                         else:
-                            # ถ้าแถวไม่พอ ให้เป็นค่าว่างทั้งคอลัมน์
                             full_predictions = [None] * len(input_df)
                             
-                        # เพิ่มคอลัมน์ชื่อโมเดลนั้นๆ ลงในไฟล์ดาวน์โหลด
                         download_df[f'Predict_{m_name}_Indoor_PC0.1'] = full_predictions
 
-                # ---------------------------------------------------------
-                # 2. สร้างไฟล์ใหม่สำหรับดาวน์โหลด และแสดงปุ่ม
-                # ---------------------------------------------------------
                 csv_data = download_df.to_csv(index=False).encode('utf-8-sig') 
                 
                 st.sidebar.markdown("---")
@@ -322,12 +301,8 @@ if uploaded_file is not None:
                     mime="text/csv",
                 )
 
-                # ---------------------------------------------------------
-                # 3. นำค่าที่ทำนายได้ "เฉพาะโมเดลที่เลือก" ไปแสดงบน Dashboard
-                # ---------------------------------------------------------
-                # ดึงค่าผลทำนายของโมเดลที่ผู้ใช้เลือกจากตาราง download_df บรรทัดสุดท้าย
+                # ดึงค่าไปโชว์บน Dashboard
                 pred_col_name = f'Predict_{selected_model_name}_Indoor_PC0.1'
-                # ป้องกันกรณีค่าแถวสุดท้ายเป็น None
                 last_pred = download_df.iloc[-1][pred_col_name]
                 pred_val = int(last_pred) if pd.notna(last_pred) else 0
 
@@ -340,11 +315,6 @@ if uploaded_file is not None:
                 
                 html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, selected_model_name)
                 components.html(html_content, height=1100, scrolling=True)
-                
-            else:
-                st.error(f"ข้อมูลไม่เพียงพอ! โมเดล {selected_model_name} ต้องการอย่างน้อย {seq_len} แถว (ปัจจุบันอัปโหลดมา {len(input_df)} แถว)")
-                st.markdown("<br><br>", unsafe_allow_html=True)
-                components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
                 
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์หรือประมวลผล: {e}")
