@@ -98,9 +98,19 @@ def load_models():
             with open(os.path.join(base_folder, f"{name_gru}_preprocessor.pkl"), 'rb') as f: prep_gru = pickle.load(f)
             with open(os.path.join(base_folder, f"{name_gru}_scaler.pkl"), 'rb') as f: y_scale_gru = pickle.load(f)
             
-            # ✅ แก้ไข input_size เป็น 6 ตามโมเดลตัวใหม่
             model_gru = SingleStepGRU(input_size=6, hidden_size=8, num_layers=1)
-            model_gru.load_state_dict(torch.load(path_gru, map_location=device), strict=False)
+            
+            # 💡 [จุดที่เพิ่มเข้ามา] โหลดสมองโมเดลมาเช็คชื่อก่อน
+            state_dict = torch.load(path_gru, map_location=device)
+            
+            # ถ้าชื่อเป็น linear ให้เปลี่ยนเป็น fc ให้ตรงกับโครงสร้างเว็บ
+            if 'linear.weight' in state_dict:
+                state_dict['fc.weight'] = state_dict.pop('linear.weight')
+            if 'linear.bias' in state_dict:
+                state_dict['fc.bias'] = state_dict.pop('linear.bias')
+                
+            # โหลดสมองเข้าโมเดล (ตอนนี้ชื่อตรงกัน 100% แล้ว)
+            model_gru.load_state_dict(state_dict, strict=False)
             model_gru.to(device).eval()
             models['GRU'] = (model_gru, prep_gru, y_scale_gru, 12)
         else:
