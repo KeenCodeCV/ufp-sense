@@ -242,12 +242,13 @@ if uploaded_file is not None:
     if selected_model_name in models:
         try:
             input_df = pd.read_csv(uploaded_file)
-            original_cols = input_df.columns.tolist() # เก็บชื่อคอลัมน์เดิมไว้
+            original_cols = input_df.columns.tolist() 
             
             if 'Wind_Dir' in input_df.columns:
                 input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
                 input_df['Wind_Dir_sin'] = np.sin(np.radians(input_df['Wind_Dir']))
             
+            # โหลดสเปคของโมเดลที่ผู้ใช้เลือกสำหรับแสดงผลบน Dashboard
             model, prep, y_scaler, seq_len = models[selected_model_name]
             
             cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
@@ -260,65 +261,79 @@ if uploaded_file is not None:
                  
             elif len(input_df) >= seq_len:
                 # ---------------------------------------------------------
-                # 1. ระบบกวาดทำนายผล (Batch Prediction) สำหรับทุกแถวในไฟล์
+                # 1. ระบบกวาดทำนายผล (Batch Prediction) สำหรับ "ทั้ง 3 โมเดล"
                 # ---------------------------------------------------------
-                X_processed_all = prep.transform(input_df[cols])
+                download_df = input_df[original_cols].copy() 
                 
-                sequences = []
-                # สไลด์ข้อมูลทีละ seq_len แถว เพื่อสร้างชุดคำถามทั้งหมด
-                for i in range(len(X_processed_all) - seq_len + 1):
-                    sequences.append(X_processed_all[i : i + seq_len])
-                
-                seq_tensor = torch.FloatTensor(np.array(sequences)).to(device)
-                
-                preds_list = []
-                chunk_size = 256 # แบ่งทำนายทีละ 256 ชุด ป้องกันคอมค้าง
-                model.eval()
-                with torch.no_grad():
-                    for i in range(0, len(seq_tensor), chunk_size):
-                        chunk = seq_tensor[i:i+chunk_size]
-                        out = model(chunk)
-                        preds_list.append(out.cpu().numpy())
-                
-                if preds_list:
-                    preds_scaled = np.vstack(preds_list)
-                    raw_preds = y_scaler.inverse_transform(preds_scaled)
-                    # หาร 1000 เพื่อแปลงหน่วย PC/L เป็น PC/cm³
-                    preds_final = (raw_preds / 1000).flatten().astype(int)
-                else:
-                    preds_final = []
-                
-                # แถวแรกๆ ที่ข้อมูลไม่ครบ seq_len จะถูกใส่เป็นค่าว่าง (None)
-                full_predictions = [None] * (seq_len - 1) + preds_final.tolist()
-                
+                # วนลูปทำนายให้ครบทุกโมเดลที่มีในระบบ
+                for m_name in ["LSTM", "GRU", "RNN"]:
+                    if m_name in models:
+                        mod_i, prep_i, y_scaler_i, seq_len_i = models[m_name]
+                        
+                        # เช็คว่าข้อมูลในไฟล์ยาวพอสำหรับโมเดลนี้ไหม
+                        if len(input_df) >= seq_len_i:
+                            X_proc_all = prep_i.transform(input_df[cols])
+                            
+                            sequences = []
+                            for i in range(len(X_proc_all) - seq_len_i + 1):
+                                sequences.append(X_proc_all[i : i + seq_len_i])
+                            
+                            seq_tensor = torch.FloatTensor(np.array(sequences)).to(device)
+                            
+                            preds_list = []
+                            chunk_size = 256
+                            mod_i.eval()
+                            with torch.no_grad():
+                                for i in range(0, len(seq_tensor), chunk_size):
+                                    chunk = seq_tensor[i:i+chunk_size]
+                                    out = mod_i(chunk)
+                                    preds_list.append(out.cpu().numpy())
+                            
+                            if preds_list:
+                                preds_scaled = np.vstack(preds_list)
+                                raw_preds = y_scaler_i.inverse_transform(preds_scaled)
+                                preds_final = (raw_preds / 1000).flatten().astype(int)
+                            else:
+                                preds_final = np.array([])
+                            
+                            # เติมค่า None ในแถวแรกๆ ที่ข้อมูลไม่ครบ Seq_len ของแต่ละโมเดล
+                            full_predictions = [None] * (seq_len_i - 1) + preds_final.tolist()
+                        else:
+                            # ถ้าแถวไม่พอ ให้เป็นค่าว่างทั้งคอลัมน์
+                            full_predictions = [None] * len(input_df)
+                            
+                        # เพิ่มคอลัมน์ชื่อโมเดลนั้นๆ ลงในไฟล์ดาวน์โหลด
+                        download_df[f'Predict_{m_name}_Indoor_PC0.1'] = full_predictions
+
                 # ---------------------------------------------------------
                 # 2. สร้างไฟล์ใหม่สำหรับดาวน์โหลด และแสดงปุ่ม
                 # ---------------------------------------------------------
-                download_df = input_df[original_cols].copy() # เอาเฉพาะคอลัมน์เดิมที่อัปโหลดมา
-                download_df['Predict Indoor_PC0.1'] = full_predictions # เพิ่มคอลัมน์ผลทำนาย
-                
-                csv_data = download_df.to_csv(index=False).encode('utf-8-sig') # ใช้ utf-8-sig ป้องกันภาษาไทยเพี้ยน
+                csv_data = download_df.to_csv(index=False).encode('utf-8-sig') 
                 
                 st.sidebar.markdown("---")
-                st.sidebar.success("✅ ประมวลผลเสร็จสิ้น!")
+                st.sidebar.success("✅ ประมวลผลครบทั้ง 3 โมเดลเสร็จสิ้น!")
                 st.sidebar.download_button(
                     label="📥 ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
                     data=csv_data,
-                    file_name=f"predicted_{selected_model_name}_{uploaded_file.name}",
+                    file_name=f"predicted_All_Models_{uploaded_file.name}",
                     mime="text/csv",
                 )
 
                 # ---------------------------------------------------------
-                # 3. นำค่าที่ทำนายได้ "แถวสุดท้าย" ไปแสดงบน Dashboard
+                # 3. นำค่าที่ทำนายได้ "เฉพาะโมเดลที่เลือก" ไปแสดงบน Dashboard
                 # ---------------------------------------------------------
+                # ดึงค่าผลทำนายของโมเดลที่ผู้ใช้เลือกจากตาราง download_df บรรทัดสุดท้าย
+                pred_col_name = f'Predict_{selected_model_name}_Indoor_PC0.1'
+                # ป้องกันกรณีค่าแถวสุดท้ายเป็น None
+                last_pred = download_df.iloc[-1][pred_col_name]
+                pred_val = int(last_pred) if pd.notna(last_pred) else 0
+
                 last_row = input_df.iloc[-1]
                 pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
                 temp_disp = round(last_row['Outdoor_Temperature'], 2)
                 humid_disp = round(last_row['Outdoor_Humidity'], 2)
                 wind_spd = round(last_row['Wind_Speed'], 2)
                 wind_disp = round(last_row['Wind_Dir'], 2) if 'Wind_Dir' in input_df.columns else 0
-
-                pred_val = int(preds_final[-1]) if len(preds_final) > 0 else 0
                 
                 html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, selected_model_name)
                 components.html(html_content, height=1100, scrolling=True)
