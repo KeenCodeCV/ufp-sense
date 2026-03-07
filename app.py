@@ -35,10 +35,10 @@ components.html(
 )
 
 # ==========================================
-# [ส่วนที่ 1: คลาสโมเดล]
+# [ส่วนที่ 1: คลาสโมเดล] (แก้ไข Syntax Error แล้ว)
 # ==========================================
 class SingleStepGRU(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int = 128, num_layers: int = 2):
+    def __init__(self, input_size: int = 8, hidden_size: int = 8, num_layers: int = 1):
         super(SingleStepGRU, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -47,11 +47,11 @@ class SingleStepGRU(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.gru(x, h0)
-        out = self.fc(out[:, -1, :])
+        out = self.fc(out[:, -1, :]) # แก้ไขจาก out[:, -1, ) เป็น out[:, -1, :]
         return out
 
 class SingleStepRNN(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int = 128, num_layers: int = 2):
+    def __init__(self, input_size: int = 8, hidden_size: int = 128, num_layers: int = 2):
         super(SingleStepRNN, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -60,11 +60,11 @@ class SingleStepRNN(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.rnn(x, h0)
-        out = self.fc(out[:, -1, :])
+        out = self.fc(out[:, -1, :]) # แก้ไขจาก out[:, -1, )
         return out
 
 class SingleStepLSTM(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int = 128, num_layers: int = 2):
+    def __init__(self, input_size: int = 8, hidden_size: int = 128, num_layers: int = 2):
         super(SingleStepLSTM, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -74,7 +74,7 @@ class SingleStepLSTM(nn.Module):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.LSTM(x, (h0, c0))
-        out = self.fc(out[:, -1, :])
+        out = self.fc(out[:, -1, :]) # แก้ไขจาก out[:, -1, )
         return out
 
 # ==========================================
@@ -87,34 +87,31 @@ def load_models():
     base_folder = "models"
     
     if not os.path.exists(base_folder):
-        st.error(f"❌ ไม่พบโฟลเดอร์ '{base_folder}' ในระบบ โปรดสร้างโฟลเดอร์และใส่ไฟล์โมเดล")
+        st.error(f" ไม่พบโฟลเดอร์ '{base_folder}' ในระบบ โปรดสร้างโฟลเดอร์และใส่ไฟล์โมเดล")
         return models, device
 
-    # --- 1. โหลด GRU (Seq=12, Features=6) ---
+    # --- 1. โหลด GRU (ปรับเป็น Seq=12, Features=8 ตามผลรันล่าสุด) ---
     try:
-        name_gru = "gru_latest"
+        name_gru = "gru_latest" # ตรวจสอบชื่อไฟล์ให้ตรงกับไฟล์จริง
         path_gru = os.path.join(base_folder, f"{name_gru}.pth")
         if os.path.exists(path_gru):
             with open(os.path.join(base_folder, f"{name_gru}_preprocessor.pkl"), 'rb') as f: prep_gru = pickle.load(f)
             with open(os.path.join(base_folder, f"{name_gru}_scaler.pkl"), 'rb') as f: y_scale_gru = pickle.load(f)
             
-            model_gru = SingleStepGRU(input_size=6, hidden_size=8, num_layers=1)
+            # โครงสร้างตรงกับสเปคล่าสุด
+            model_gru = SingleStepGRU(input_size=8, hidden_size=8, num_layers=1)
             
-            # 💡 [จุดที่เพิ่มเข้ามา] โหลดสมองโมเดลมาเช็คชื่อก่อน
             state_dict = torch.load(path_gru, map_location=device)
-            
-            # ถ้าชื่อเป็น linear ให้เปลี่ยนเป็น fc ให้ตรงกับโครงสร้างเว็บ
             if 'linear.weight' in state_dict:
                 state_dict['fc.weight'] = state_dict.pop('linear.weight')
             if 'linear.bias' in state_dict:
                 state_dict['fc.bias'] = state_dict.pop('linear.bias')
                 
-            # โหลดสมองเข้าโมเดล (ตอนนี้ชื่อตรงกัน 100% แล้ว)
             model_gru.load_state_dict(state_dict, strict=False)
             model_gru.to(device).eval()
-            models['GRU'] = (model_gru, prep_gru, y_scale_gru, 12)
+            models['GRU'] = (model_gru, prep_gru, y_scale_gru, 12) # Lookback = 12
         else:
-            st.warning(f"⚠️ หาไฟล์ GRU ไม่พบ: {path_gru}")
+            st.warning(f" หาไฟล์ GRU ไม่พบ: {path_gru}")
     except Exception as e: st.error(f"GRU Error: {e}")
 
     # --- 2. โหลด RNN (Seq=24, Features=8) ---
@@ -130,7 +127,7 @@ def load_models():
             model_rnn.to(device).eval()
             models['RNN'] = (model_rnn, prep_rnn, y_scale_rnn, 24)
         else:
-            st.warning(f"⚠️ หาไฟล์ RNN ไม่พบ: {path_rnn}")
+            st.warning(f" หาไฟล์ RNN ไม่พบ: {path_rnn}")
     except Exception as e: st.error(f"RNN Error: {e}")
 
     # --- 3. โหลด LSTM (Seq=42, Features=8) ---
@@ -146,7 +143,7 @@ def load_models():
             model_lstm.to(device).eval()
             models['LSTM'] = (model_lstm, prep_lstm, y_scale_lstm, 42)
         else:
-            st.warning(f"⚠️ หาไฟล์ LSTM ไม่พบ: {path_lstm}")
+            st.warning(f" หาไฟล์ LSTM ไม่พบ: {path_lstm}")
     except Exception as e: st.error(f"LSTM Error: {e}")
     
     return models, device
@@ -189,7 +186,7 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
             {js_content} 
             
             setTimeout(function() {{
-                if(window.updateStatus) window.updateStatus({pm01_val}, `{ai_text}`);
+                if(window.updateStatus) window.updateStatus({pm01_val}, "{ai_text}");
                 if(window.updateWindDirection) window.updateWindDirection({wind_val});
                 
                 if(window.updateCharts) window.updateCharts({chart_current}, {chart_hour}, {chart_day});
@@ -227,12 +224,12 @@ st.markdown("""
 
 models, device = load_models()
 
-st.sidebar.title("⚡ Control Panel")
+st.sidebar.title(" Control Panel")
 if not models:
-    st.sidebar.error("❌ ไม่พบโมเดลสักตัว! กรุณาตรวจสอบโฟลเดอร์ 'models' ว่ามีไฟล์ครบหรือไม่")
+    st.sidebar.error(" ไม่พบโมเดลสักตัว! กรุณาตรวจสอบโฟลเดอร์ 'models' ว่ามีไฟล์ครบหรือไม่")
 
 selected_model_name = st.sidebar.selectbox("เลือกโมเดล (Model)", ["LSTM", "GRU", "RNN"], index=0)
-uploaded_file = st.sidebar.file_uploader("📂 อัปโหลดไฟล์ CSV (Data Input)", type=["csv"])
+uploaded_file = st.sidebar.file_uploader(" อัปโหลดไฟล์ CSV (Data Input)", type=["csv"])
 
 if uploaded_file is not None:
     if selected_model_name in models:
@@ -240,7 +237,7 @@ if uploaded_file is not None:
             input_df = pd.read_csv(uploaded_file)
             original_cols = input_df.columns.tolist() 
             
-            # เตรียมคอลัมน์ cos/sin ล่วงหน้าสำหรับ LSTM/RNN ที่ต้องใช้
+            # เตรียมคอลัมน์ cos/sin ล่วงหน้าสำหรับทุกโมเดล
             if 'Wind_Dir' in input_df.columns:
                 input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
                 input_df['Wind_Dir_sin'] = np.sin(np.radians(input_df['Wind_Dir']))
@@ -250,7 +247,7 @@ if uploaded_file is not None:
             missing_cols = [c for c in base_cols if c not in input_df.columns]
             
             if missing_cols:
-                 st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์พื้นฐาน: {', '.join(missing_cols)}")
+                 st.error(f" ไฟล์ CSV ขาดคอลัมน์พื้นฐาน: {', '.join(missing_cols)}")
                  st.markdown("<br><br>", unsafe_allow_html=True)
                  components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
                  
@@ -262,14 +259,10 @@ if uploaded_file is not None:
                     if m_name in models:
                         mod_i, prep_i, y_scaler_i, seq_len_i = models[m_name]
                         
-                        # ✅ เลือกว่าโมเดลไหนใช้กี่คอลัมน์ (GRU ใช้ 6, LSTM/RNN ใช้ 8)
-                        if m_name == "GRU":
-                            model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
-                        else:
-                            model_cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
+                        # ใช้ 8 คอลัมน์เหมือนกันสำหรับทุกโมเดล
+                        model_cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
                         
                         if len(input_df) >= seq_len_i:
-                            # ป้อนข้อมูลเข้า AI เฉพาะคอลัมน์ที่มันรู้จัก
                             X_proc_all = prep_i.transform(input_df[model_cols])
                             
                             sequences = []
@@ -303,9 +296,9 @@ if uploaded_file is not None:
                 csv_data = download_df.to_csv(index=False).encode('utf-8-sig') 
                 
                 st.sidebar.markdown("---")
-                st.sidebar.success("✅ ประมวลผลครบทั้ง 3 โมเดลเสร็จสิ้น!")
+                st.sidebar.success(" ประมวลผลครบทั้ง 3 โมเดลเสร็จสิ้น!")
                 st.sidebar.download_button(
-                    label="📥 ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
+                    label=" ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
                     data=csv_data,
                     file_name=f"predicted_All_Models_{uploaded_file.name}",
                     mime="text/csv",
@@ -331,7 +324,7 @@ if uploaded_file is not None:
             st.markdown("<br><br>", unsafe_allow_html=True)
             components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
     else:
-        st.error(f"❌ ไม่สามารถใช้งานโมเดล '{selected_model_name}' ได้ กรุณาตรวจสอบไฟล์ในโฟลเดอร์ 'models'")
+        st.error(f" ไม่สามารถใช้งานโมเดล '{selected_model_name}' ได้ กรุณาตรวจสอบไฟล์ในโฟลเดอร์ 'models'")
         st.markdown("<br><br>", unsafe_allow_html=True)
         components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
 else:
