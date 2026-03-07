@@ -93,18 +93,22 @@ def load_models():
         st.error(f"❌ ไม่พบโฟลเดอร์ '{base_folder}' ในระบบ โปรดสร้างโฟลเดอร์และใส่ไฟล์โมเดล")
         return models, device
 
-    # --- 1. โหลด GRU (Seq=48) ---
+    # --- 1. โหลด GRU (Seq=12) อัปเดตไฟล์ใหม่ ---
     try:
-        name_gru = "gru_Best_Model_20260306_181208"
+        # ✅ อัปเดตชื่อไฟล์เป็น gru_latest
+        name_gru = "gru_latest"
         path_gru = os.path.join(base_folder, f"{name_gru}.pth")
         if os.path.exists(path_gru):
             with open(os.path.join(base_folder, f"{name_gru}_preprocessor.pkl"), 'rb') as f: prep_gru = pickle.load(f)
             with open(os.path.join(base_folder, f"{name_gru}_scaler.pkl"), 'rb') as f: y_scale_gru = pickle.load(f)
             
+            # ✅ สเปคใหม่ของ GRU
             model_gru = SingleStepGRU(input_size=8, hidden_size=8, num_layers=1)
             model_gru.load_state_dict(torch.load(path_gru, map_location=device), strict=False)
             model_gru.to(device).eval()
-            models['GRU'] = (model_gru, prep_gru, y_scale_gru, 48)
+            
+            # ✅ ปรับ Seq เป็น 12
+            models['GRU'] = (model_gru, prep_gru, y_scale_gru, 12)
         else:
             st.warning(f"⚠️ หาไฟล์ GRU ไม่พบ: {path_gru}")
     except Exception as e: st.error(f"GRU Error: {e}")
@@ -127,7 +131,6 @@ def load_models():
 
     # --- 3. โหลด LSTM (Seq=42) ---
     try:
-        # ✅ แก้ไขชื่อไฟล์ LSTM ให้ตรงกับไฟล์จริงๆ ของคุณแล้ว
         name_lstm = "lstm_Best_Model_20260306_235311" 
         path_lstm = os.path.join(base_folder, f"{name_lstm}.pth")
         if os.path.exists(path_lstm):
