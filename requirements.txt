@@ -2,5 +2,5 @@ streamlit
 torch
 pandas
 numpy
-
-scikit-learn==1.6.1
+firebase-admin
+scikit-learn
