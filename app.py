@@ -39,13 +39,21 @@ components.html(
 # [ส่วนที่ 0: ตั้งค่าการเชื่อมต่อ Firebase]
 # ==========================================
 FIREBASE_CREDENTIALS_FILE = "serviceAccountKey.json" 
-FIREBASE_DATABASE_URL = "https://lab10-f138a-default-rtdb.asia-southeast1.firebasedatabase.app/" # ⬅️ ใส่ URL ของ Firebase ของคุณ
-FIREBASE_NODE_NAME = "sensor_data" # ⬅️ ใส่ชื่อ Node (โฟลเดอร์) ใน Firebase
+FIREBASE_DATABASE_URL = "https://lab10-f138a-default-rtdb.asia-southeast1.firebasedatabase.app/" 
+FIREBASE_NODE_NAME = "raw_sensor_data/history" # ⬅️ ชี้เป้าไปที่โหนดประวัติ
 
 if not firebase_admin._apps:
     try:
-        if os.path.exists(FIREBASE_CREDENTIALS_FILE):
+        if "firebase" in st.secrets:
+            cred_dict = dict(st.secrets["firebase"])
+            cred = credentials.Certificate(cred_dict)
+        elif os.path.exists(FIREBASE_CREDENTIALS_FILE):
             cred = credentials.Certificate(FIREBASE_CREDENTIALS_FILE)
+        else:
+            st.sidebar.error("❌ ไม่พบกุญแจเชื่อมต่อ Firebase ทั้งในไฟล์และ Secrets")
+            cred = None
+            
+        if cred:
             firebase_admin.initialize_app(cred, {
                 'databaseURL': FIREBASE_DATABASE_URL
             })
@@ -164,7 +172,7 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
                 if(pm25Elem) pm25Elem.innerText = '{pm25_val}';
                 if(tempElem) tempElem.innerText = '{temp_val}';
                 if(humidElem) humidElem.innerText = '{humid_val}';
-                if(modelElem) modelElem.innerText = 'Predicted by GRU Model';
+                if(modelElem) modelElem.innerText = 'Live Predicted by GRU Model';
             }}, 500);
         </script>
         """
@@ -192,7 +200,6 @@ st.sidebar.title("⚙️ Control Panel")
 if not gru_model_data:
     st.sidebar.error("❌ ไม่พบโมเดล GRU! กรุณาตรวจสอบโฟลเดอร์ 'models'")
 
-# 🔘 สร้างสวิตช์เลือกโหมดการทำงาน
 app_mode = st.sidebar.radio(
     "เลือกโหมดการทำงาน:",
     ("📡 โหมด Live (Firebase)", "📂 โหมด Test (Upload CSV)")
@@ -214,6 +221,17 @@ if app_mode == "📡 โหมด Live (Firebase)":
                 input_df = fetch_latest_firebase_data(limit=seq_len_i)
                 
                 if not input_df.empty:
+                    # 💡 แปลงชื่อคอลัมน์จาก API ให้ตรงกับ Model
+                    rename_map = {
+                        'wind_dir': 'Wind_Dir',
+                        'wind_speed': 'Wind_Speed',
+                        'outdoor_temp': 'Outdoor_Temperature',
+                        'outdoor_hum': 'Outdoor_Humidity',
+                        'bar': 'Bar',
+                        'outdoor_pm25': 'Outdoor_PM2.5'
+                    }
+                    input_df = input_df.rename(columns=rename_map)
+
                     model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
                     missing_cols = [c for c in model_cols if c not in input_df.columns]
                     
@@ -242,15 +260,14 @@ if app_mode == "📡 โหมด Live (Firebase)":
                         html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, True)
                         components.html(html_content, height=1100, scrolling=True)
                     else:
-                        st.warning(f"⚠️ ข้อมูลใน Firebase มีไม่ถึง {seq_len_i} แถว")
+                        st.warning(f"⚠️ ข้อมูลใน Firebase มีไม่ถึง {seq_len_i} แถว (มี {len(input_df)} แถว) รอเซ็นเซอร์ส่งข้อมูลอีกนิดนะครับ")
                         components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
                 else:
-                    st.error("❌ ไม่พบข้อมูลใน Firebase หรือตั้งค่า URL/Node ผิด")
+                    st.error("❌ ไม่พบข้อมูลใน Firebase หรือหา Node history ไม่เจอ")
                     components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
         else:
             components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
     else:
-        # กรณียังไม่ได้กดปุ่มดึงข้อมูล
         components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
 
 # ==========================================
@@ -339,5 +356,4 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
         else:
             components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
     else:
-        # กรณียังไม่ได้อัปโหลดไฟล์
         components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
