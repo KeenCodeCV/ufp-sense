@@ -192,9 +192,9 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
                 var humidElem = document.getElementById('val-humid');
                 var modelElem = document.getElementById('modelNameDisplay');
                 
-                if(pm25Elem) pm25Elem.innerHTML = '{pm25_val} <span class="text-xs font-normal text-slate-500">µg/m³</span>';
-                if(tempElem) tempElem.innerHTML = '{temp_val} <span class="text-xs font-normal text-slate-500">°C</span>';
-                if(humidElem) humidElem.innerHTML = '{humid_val} <span class="text-xs font-normal text-slate-500">%</span>';
+                if(pm25Elem) pm25Elem.innerText = '{pm25_val}';
+                if(tempElem) tempElem.innerText = '{temp_val}';
+                if(humidElem) humidElem.innerText = '{humid_val}';
                 if(modelElem) modelElem.innerText = 'Predicted by {model_name} Model';
                 
             }}, 500);
