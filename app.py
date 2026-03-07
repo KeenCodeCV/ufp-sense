@@ -208,9 +208,21 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
 # ==========================================
 st.markdown("""
     <style>
+        /* ดันขอบจอให้ชิดขึ้น */
         .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
+        
+        /* 1. ซ่อนเมนู Streamlit และ Footer ด้านล่าง */
         #MainMenu {visibility: hidden;} 
         footer {visibility: hidden;}
+        
+        /* 2. ซ่อนปุ่ม Deploy (มุมบนขวา) */
+        [data-testid="stAppDeployButton"] {display: none !important;}
+        
+        /* 3. 🥷 ซ่อนปุ่มลอยๆ มุมขวาล่าง (ลายน้ำ Streamlit / Manage App) */
+        .viewerBadge_container {display: none !important;}
+        .viewerBadge_link {display: none !important;}
+        
+        /* ปรับแต่งกล่องแจ้งเตือน (Alert) */
         div[data-testid="stAlert"] { margin-top: -15px !important; padding: 10px !important; }
     </style>
 """, unsafe_allow_html=True)
