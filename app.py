@@ -35,10 +35,9 @@ components.html(
 )
 
 # ==========================================
-# [ส่วนที่ 1: คลาสโมเดล]
+# [ส่วนที่ 1: คลาสโมเดล GRU]
 # ==========================================
 class SingleStepGRU(nn.Module):
-    # ปรับกลับเป็นรับ input_size ตัวแปร เพื่อให้ยืดหยุ่นตอนเรียกใช้
     def __init__(self, input_size: int, hidden_size: int = 8, num_layers: int = 1):
         super(SingleStepGRU, self).__init__()
         self.hidden_size = hidden_size
@@ -48,58 +47,31 @@ class SingleStepGRU(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.gru(x, h0)
-        out = self.fc(out[:, -1, :]) # แก้ไข Syntax Error แล้ว
-        return out
-
-class SingleStepRNN(nn.Module):
-    def __init__(self, input_size: int = 8, hidden_size: int = 128, num_layers: int = 2):
-        super(SingleStepRNN, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, 1)
-    def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        out, _ = self.rnn(x, h0)
-        out = self.fc(out[:, -1, :])
-        return out
-
-class SingleStepLSTM(nn.Module):
-    def __init__(self, input_size: int = 8, hidden_size: int = 128, num_layers: int = 2):
-        super(SingleStepLSTM, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.LSTM = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, 1)
-    def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        out, _ = self.LSTM(x, (h0, c0))
-        out = self.fc(out[:, -1, :])
+        out = self.fc(out[:, -1, :]) 
         return out
 
 # ==========================================
-# [ส่วนที่ 2: ฟังก์ชันโหลดโมเดล]
+# [ส่วนที่ 2: ฟังก์ชันโหลดโมเดล GRU]
 # ==========================================
 @st.cache_resource
 def load_models():
-    models = {}
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     base_folder = "models"
+    model_data = None
     
     if not os.path.exists(base_folder):
-        st.error(f" ไม่พบโฟลเดอร์ '{base_folder}' ในระบบ โปรดสร้างโฟลเดอร์และใส่ไฟล์โมเดล")
-        return models, device
+        st.error(f"❌ ไม่พบโฟลเดอร์ '{base_folder}' ในระบบ โปรดสร้างโฟลเดอร์และใส่ไฟล์โมเดล")
+        return model_data, device
 
-    # --- 1. โหลด GRU ---
     try:
-        name_gru = "gru_latest" # ตรวจสอบชื่อไฟล์
+        name_gru = "gru_latest" 
         path_gru = os.path.join(base_folder, f"{name_gru}.pth")
+        
         if os.path.exists(path_gru):
             with open(os.path.join(base_folder, f"{name_gru}_preprocessor.pkl"), 'rb') as f: prep_gru = pickle.load(f)
             with open(os.path.join(base_folder, f"{name_gru}_scaler.pkl"), 'rb') as f: y_scale_gru = pickle.load(f)
             
-            # โครงสร้างตรงกับสเปคจริง: รับ 6 ฟีเจอร์
+            # โครงสร้าง GRU ล่าสุด: รับ 6 ฟีเจอร์
             model_gru = SingleStepGRU(input_size=6, hidden_size=8, num_layers=1)
             
             state_dict = torch.load(path_gru, map_location=device)
@@ -110,44 +82,15 @@ def load_models():
                 
             model_gru.load_state_dict(state_dict, strict=False)
             model_gru.to(device).eval()
-            models['GRU'] = (model_gru, prep_gru, y_scale_gru, 12) # Lookback = 12
-        else:
-            st.warning(f" หาไฟล์ GRU ไม่พบ: {path_gru}")
-    except Exception as e: st.error(f"GRU Error: {e}")
-
-    # --- 2. โหลด RNN ---
-    try:
-        name_rnn = "rnn_Best_Model_20260306_164237"
-        path_rnn = os.path.join(base_folder, f"{name_rnn}.pth")
-        if os.path.exists(path_rnn):
-            with open(os.path.join(base_folder, f"{name_rnn}_preprocessor.pkl"), 'rb') as f: prep_rnn = pickle.load(f)
-            with open(os.path.join(base_folder, f"{name_rnn}_scaler.pkl"), 'rb') as f: y_scale_rnn = pickle.load(f)
             
-            model_rnn = SingleStepRNN(input_size=8, hidden_size=16, num_layers=3)
-            model_rnn.load_state_dict(torch.load(path_rnn, map_location=device), strict=False)
-            model_rnn.to(device).eval()
-            models['RNN'] = (model_rnn, prep_rnn, y_scale_rnn, 24)
+            # คืนค่า: โมเดล, ตัวแปลงเข้า, ตัวแปลงออก, และ Sequence Length (12)
+            model_data = (model_gru, prep_gru, y_scale_gru, 12) 
         else:
-            st.warning(f" หาไฟล์ RNN ไม่พบ: {path_rnn}")
-    except Exception as e: st.error(f"RNN Error: {e}")
-
-    # --- 3. โหลด LSTM ---
-    try:
-        name_lstm = "lstm_Best_Model_20260306_235311" 
-        path_lstm = os.path.join(base_folder, f"{name_lstm}.pth")
-        if os.path.exists(path_lstm):
-            with open(os.path.join(base_folder, f"{name_lstm}_preprocessor.pkl"), 'rb') as f: prep_lstm = pickle.load(f)
-            with open(os.path.join(base_folder, f"{name_lstm}_scaler.pkl"), 'rb') as f: y_scale_lstm = pickle.load(f)
-            
-            model_lstm = SingleStepLSTM(input_size=8, hidden_size=8, num_layers=1)
-            model_lstm.load_state_dict(torch.load(path_lstm, map_location=device), strict=False)
-            model_lstm.to(device).eval()
-            models['LSTM'] = (model_lstm, prep_lstm, y_scale_lstm, 42)
-        else:
-            st.warning(f" หาไฟล์ LSTM ไม่พบ: {path_lstm}")
-    except Exception as e: st.error(f"LSTM Error: {e}")
+            st.warning(f"⚠️ หาไฟล์ GRU ไม่พบ: {path_gru}")
+    except Exception as e: 
+        st.error(f"GRU Error: {e}")
     
-    return models, device
+    return model_data, device
 
 # ==========================================
 # [ส่วนฟังก์ชัน สร้าง AI Insight อัจฉริยะ]
@@ -165,7 +108,7 @@ def generate_ai_insight(pm01, pm25, wind_speed, temp, humid):
 # ==========================================
 # [ส่วนที่ 3: ฟังก์ชันอ่านไฟล์เว็บและ Inject ค่า]
 # ==========================================
-def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind_speed, model_name):
+def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind_speed, is_active):
     try:
         with open("index.html", "r", encoding="utf-8") as f: html_content = f.read()
         with open("style.css", "r", encoding="utf-8") as f: css_content = f.read()
@@ -173,7 +116,7 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
     except FileNotFoundError:
         return "<h3 style='color:red; text-align:center;'>Error: ไม่พบไฟล์ index.html, style.css หรือ script.js</h3>"
 
-    if model_name == "No Model":
+    if not is_active:
         injection_script = f"<script>{js_content}\n setTimeout(function() {{ if(window.resetSystem) window.resetSystem(); }}, 500);</script>"
     else:
         ai_text = generate_ai_insight(pm01_val, pm25_val, wind_speed, temp_val, humid_val)
@@ -200,7 +143,7 @@ def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind
                 if(pm25Elem) pm25Elem.innerText = '{pm25_val}';
                 if(tempElem) tempElem.innerText = '{temp_val}';
                 if(humidElem) humidElem.innerText = '{humid_val}';
-                if(modelElem) modelElem.innerText = 'Predicted by {model_name} Model';
+                if(modelElem) modelElem.innerText = 'Predicted by GRU Model';
                 
             }}, 500);
         </script>
@@ -223,91 +166,77 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-models, device = load_models()
+gru_model_data, device = load_models()
 
-st.sidebar.title(" Control Panel")
-if not models:
-    st.sidebar.error(" ไม่พบโมเดลสักตัว! กรุณาตรวจสอบโฟลเดอร์ 'models' ว่ามีไฟล์ครบหรือไม่")
+st.sidebar.title("⚡ Control Panel")
+if not gru_model_data:
+    st.sidebar.error("❌ ไม่พบโมเดล GRU! กรุณาตรวจสอบโฟลเดอร์ 'models' ว่ามีไฟล์ครบหรือไม่")
 
-selected_model_name = st.sidebar.selectbox("เลือกโมเดล (Model)", ["LSTM", "GRU", "RNN"], index=0)
-uploaded_file = st.sidebar.file_uploader(" อัปโหลดไฟล์ CSV (Data Input)", type=["csv"])
+uploaded_file = st.sidebar.file_uploader("📂 อัปโหลดไฟล์ CSV (Data Input)", type=["csv"])
 
 if uploaded_file is not None:
-    if selected_model_name in models:
+    if gru_model_data is not None:
         try:
             input_df = pd.read_csv(uploaded_file)
             original_cols = input_df.columns.tolist() 
             
-            if 'Wind_Dir' in input_df.columns:
-                input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
-                input_df['Wind_Dir_sin'] = np.sin(np.radians(input_df['Wind_Dir']))
-            
-            base_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
-            missing_cols = [c for c in base_cols if c not in input_df.columns]
+            # ฟีเจอร์หลัก 6 ตัวที่ GRU ต้องการเป๊ะๆ
+            model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+            missing_cols = [c for c in model_cols if c not in input_df.columns]
             
             if missing_cols:
-                 st.error(f" ไฟล์ CSV ขาดคอลัมน์พื้นฐาน: {', '.join(missing_cols)}")
+                 st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์พื้นฐาน: {', '.join(missing_cols)}")
                  st.markdown("<br><br>", unsafe_allow_html=True)
-                 components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
+                 components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
                  
             else:
+                mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
                 download_df = input_df[original_cols].copy() 
                 
-                for m_name in ["LSTM", "GRU", "RNN"]:
-                    if m_name in models:
-                        mod_i, prep_i, y_scaler_i, seq_len_i = models[m_name]
-                        
-                        # แยกคอลัมน์ให้ตรงตามที่แต่ละโมเดลเทรนมา
-                        if m_name == "GRU":
-                            model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
-                        else:
-                            model_cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
-                        
-                        if len(input_df) >= seq_len_i:
-                            X_proc_all = prep_i.transform(input_df[model_cols])
-                            
-                            sequences = []
-                            for i in range(len(X_proc_all) - seq_len_i + 1):
-                                sequences.append(X_proc_all[i : i + seq_len_i])
-                            
-                            seq_tensor = torch.FloatTensor(np.array(sequences)).to(device)
-                            
-                            preds_list = []
-                            chunk_size = 256
-                            mod_i.eval()
-                            with torch.no_grad():
-                                for i in range(0, len(seq_tensor), chunk_size):
-                                    chunk = seq_tensor[i:i+chunk_size]
-                                    out = mod_i(chunk)
-                                    preds_list.append(out.cpu().numpy())
-                            
-                            if preds_list:
-                                preds_scaled = np.vstack(preds_list)
-                                raw_preds = y_scaler_i.inverse_transform(preds_scaled)
-                                preds_final = (raw_preds / 1000).flatten().astype(int)
-                            else:
-                                preds_final = np.array([])
-                            
-                            full_predictions = [None] * (seq_len_i - 1) + preds_final.tolist()
-                        else:
-                            full_predictions = [None] * len(input_df)
-                            
-                        download_df[f'Predict_{m_name}_Indoor_PC0.1'] = full_predictions
+                if len(input_df) >= seq_len_i:
+                    X_proc_all = prep_i.transform(input_df[model_cols])
+                    
+                    sequences = []
+                    for i in range(len(X_proc_all) - seq_len_i + 1):
+                        sequences.append(X_proc_all[i : i + seq_len_i])
+                    
+                    seq_tensor = torch.FloatTensor(np.array(sequences)).to(device)
+                    
+                    preds_list = []
+                    chunk_size = 256
+                    mod_i.eval()
+                    with torch.no_grad():
+                        for i in range(0, len(seq_tensor), chunk_size):
+                            chunk = seq_tensor[i:i+chunk_size]
+                            out = mod_i(chunk)
+                            preds_list.append(out.cpu().numpy())
+                    
+                    if preds_list:
+                        preds_scaled = np.vstack(preds_list)
+                        raw_preds = y_scaler_i.inverse_transform(preds_scaled)
+                        preds_final = (raw_preds / 1000).flatten().astype(int)
+                    else:
+                        preds_final = np.array([])
+                    
+                    full_predictions = [None] * (seq_len_i - 1) + preds_final.tolist()
+                else:
+                    full_predictions = [None] * len(input_df)
+                    
+                download_df['Predict_GRU_Indoor_PC0.1'] = full_predictions
 
                 csv_data = download_df.to_csv(index=False).encode('utf-8-sig') 
                 
                 st.sidebar.markdown("---")
-                st.sidebar.success(" ประมวลผลครบทั้ง 3 โมเดลเสร็จสิ้น!")
+                st.sidebar.success("✅ ประมวลผลโมเดล GRU เสร็จสิ้น!")
                 st.sidebar.download_button(
-                    label=" ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
+                    label="📥 ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
                     data=csv_data,
-                    file_name=f"predicted_All_Models_{uploaded_file.name}",
+                    file_name=f"predicted_GRU_{uploaded_file.name}",
                     mime="text/csv",
                 )
 
                 # ดึงค่าไปโชว์บน Dashboard
-                pred_col_name = f'Predict_{selected_model_name}_Indoor_PC0.1'
-                last_pred = download_df.iloc[-1][pred_col_name]
+                last_pred = download_df.iloc[-1]['Predict_GRU_Indoor_PC0.1']
                 pred_val = int(last_pred) if pd.notna(last_pred) else 0
 
                 last_row = input_df.iloc[-1]
@@ -317,18 +246,17 @@ if uploaded_file is not None:
                 wind_spd = round(last_row['Wind_Speed'], 2)
                 wind_disp = round(last_row['Wind_Dir'], 2) if 'Wind_Dir' in input_df.columns else 0
                 
-                html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, selected_model_name)
+                html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, True)
                 components.html(html_content, height=1100, scrolling=True)
                 
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์หรือประมวลผล: {e}")
             st.markdown("<br><br>", unsafe_allow_html=True)
-            components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
+            components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
     else:
-        st.error(f" ไม่สามารถใช้งานโมเดล '{selected_model_name}' ได้ กรุณาตรวจสอบไฟล์ในโฟลเดอร์ 'models'")
         st.markdown("<br><br>", unsafe_allow_html=True)
-        components.html(render_web_interface(0, 0, 0, 0, 0, 0, "No Model"), height=1100, scrolling=True)
+        components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
 else:
     st.markdown("<br><br>", unsafe_allow_html=True)
-    html_content = render_web_interface(0, 0, 0, 0, 0, 0, "No Model")
+    html_content = render_web_interface(0, 0, 0, 0, 0, 0, False)
     components.html(html_content, height=1100, scrolling=True)
