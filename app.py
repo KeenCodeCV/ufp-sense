@@ -6,6 +6,7 @@ import pickle
 import pandas as pd
 import numpy as np
 import os
+import time  # 💡 นำเข้า time เพื่อใช้หน่วงเวลา Auto-Refresh
 import firebase_admin
 from firebase_admin import credentials, db
 
@@ -40,7 +41,7 @@ components.html(
 # ==========================================
 FIREBASE_CREDENTIALS_FILE = "serviceAccountKey.json" 
 FIREBASE_DATABASE_URL = "https://lab10-f138a-default-rtdb.asia-southeast1.firebasedatabase.app/" 
-FIREBASE_NODE_NAME = "raw_sensor_data/history" # ⬅️ ชี้เป้าไปที่โหนดประวัติ
+FIREBASE_NODE_NAME = "raw_sensor_data/history"
 
 if not firebase_admin._apps:
     try:
@@ -50,7 +51,7 @@ if not firebase_admin._apps:
         elif os.path.exists(FIREBASE_CREDENTIALS_FILE):
             cred = credentials.Certificate(FIREBASE_CREDENTIALS_FILE)
         else:
-            st.sidebar.error("❌ ไม่พบกุญแจเชื่อมต่อ Firebase ทั้งในไฟล์และ Secrets")
+            st.sidebar.error("❌ ไม่พบกุญแจเชื่อมต่อ Firebase")
             cred = None
             
         if cred:
@@ -125,7 +126,7 @@ def load_models():
     return model_data, device
 
 # ==========================================
-# [ส่วนฟังก์ชัน สร้าง AI Insight อัจฉริยะ]
+# [ส่วนฟังก์ชัน สร้าง AI Insight]
 # ==========================================
 def generate_ai_insight(pm01, pm25, wind_speed, temp, humid):
     if pm01 >= 20000:
@@ -208,66 +209,76 @@ app_mode = st.sidebar.radio(
 st.sidebar.markdown("---")
 
 # ==========================================
-# โหมดที่ 1: Live (Firebase)
+# โหมดที่ 1: Live (Firebase) - อัปเดตอัตโนมัติ
 # ==========================================
 if app_mode == "📡 โหมด Live (Firebase)":
-    st.sidebar.markdown("**ดึงข้อมูลสดจากเซ็นเซอร์**")
-    fetch_button = st.sidebar.button("🔄 ดึงข้อมูลล่าสุด (Fetch Data)", type="primary")
+    st.sidebar.markdown("**ดึงข้อมูลสดจากเซ็นเซอร์แบบ Real-time**")
+    
+    # 💡 เปลี่ยนเป็นสวิตช์ (Checkbox) สำหรับเปิด/ปิด Auto-Refresh
+    auto_refresh = st.sidebar.checkbox("🟢 เปิดการอัปเดตอัตโนมัติ (Auto-Refresh)", value=False)
 
-    if fetch_button:
+    if auto_refresh:
+        st.sidebar.success("📡 ระบบกำลังดึงข้อมูลสดตลอดเวลา...")
         if gru_model_data is not None:
-            with st.spinner('📡 กำลังดึงข้อมูลจาก Firebase...'):
-                mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
-                input_df = fetch_latest_firebase_data(limit=seq_len_i)
-                
-                if not input_df.empty:
-                    # 💡 แปลงชื่อคอลัมน์จาก API ให้ตรงกับ Model
-                    rename_map = {
-                        'wind_dir': 'Wind_Dir',
-                        'wind_speed': 'Wind_Speed',
-                        'outdoor_temp': 'Outdoor_Temperature',
-                        'outdoor_hum': 'Outdoor_Humidity',
-                        'bar': 'Bar',
-                        'outdoor_pm25': 'Outdoor_PM2.5'
-                    }
-                    input_df = input_df.rename(columns=rename_map)
+            mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
+            input_df = fetch_latest_firebase_data(limit=seq_len_i)
+            
+            if not input_df.empty:
+                rename_map = {
+                    'wind_dir': 'Wind_Dir',
+                    'wind_speed': 'Wind_Speed',
+                    'outdoor_temp': 'Outdoor_Temperature',
+                    'outdoor_hum': 'Outdoor_Humidity',
+                    'bar': 'Bar',
+                    'outdoor_pm25': 'Outdoor_PM2.5'
+                }
+                input_df = input_df.rename(columns=rename_map)
 
-                    model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
-                    missing_cols = [c for c in model_cols if c not in input_df.columns]
-                    
-                    if missing_cols:
-                        st.error(f"❌ ข้อมูลใน Firebase ขาดตัวแปรเหล่านี้: {', '.join(missing_cols)}")
-                        components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
-                    elif len(input_df) >= seq_len_i:
-                        X_proc_all = prep_i.transform(input_df[model_cols])
-                        seq_tensor = torch.FloatTensor(X_proc_all).unsqueeze(0).to(device) 
-                        
-                        mod_i.eval()
-                        with torch.no_grad():
-                            out = mod_i(seq_tensor)
-                        
-                        raw_pred = y_scaler_i.inverse_transform(out.cpu().numpy())
-                        pred_val = int(raw_pred[0][0] / 1000) 
-                        
-                        last_row = input_df.iloc[-1]
-                        pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
-                        temp_disp = round(last_row['Outdoor_Temperature'], 2)
-                        humid_disp = round(last_row['Outdoor_Humidity'], 2)
-                        wind_spd = round(last_row['Wind_Speed'], 2)
-                        wind_disp = round(last_row['Wind_Dir'], 2)
-                        
-                        st.sidebar.success("✅ อัปเดตข้อมูลสำเร็จ!")
-                        html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, True)
-                        components.html(html_content, height=1100, scrolling=True)
-                    else:
-                        st.warning(f"⚠️ ข้อมูลใน Firebase มีไม่ถึง {seq_len_i} แถว (มี {len(input_df)} แถว) รอเซ็นเซอร์ส่งข้อมูลอีกนิดนะครับ")
-                        components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
-                else:
-                    st.error("❌ ไม่พบข้อมูลใน Firebase หรือหา Node history ไม่เจอ")
+                model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+                missing_cols = [c for c in model_cols if c not in input_df.columns]
+                
+                if missing_cols:
+                    st.error(f"❌ ข้อมูลใน Firebase ขาดตัวแปรเหล่านี้: {', '.join(missing_cols)}")
                     components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
-        else:
-            components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
+                    time.sleep(3) # รอ 3 วิแล้วโหลดใหม่ เผื่อข้อมูลใหม่เข้ามาครบ
+                    st.rerun()
+                elif len(input_df) >= seq_len_i:
+                    X_proc_all = prep_i.transform(input_df[model_cols])
+                    seq_tensor = torch.FloatTensor(X_proc_all).unsqueeze(0).to(device) 
+                    
+                    mod_i.eval()
+                    with torch.no_grad():
+                        out = mod_i(seq_tensor)
+                    
+                    raw_pred = y_scaler_i.inverse_transform(out.cpu().numpy())
+                    pred_val = int(raw_pred[0][0] / 1000) 
+                    
+                    last_row = input_df.iloc[-1]
+                    pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
+                    temp_disp = round(last_row['Outdoor_Temperature'], 2)
+                    humid_disp = round(last_row['Outdoor_Humidity'], 2)
+                    wind_spd = round(last_row['Wind_Speed'], 2)
+                    wind_disp = round(last_row['Wind_Dir'], 2)
+                    
+                    html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, True)
+                    components.html(html_content, height=1100, scrolling=True)
+                    
+                    # 💡 พระเอกของเราอยู่ตรงนี้: รอ 2 วินาที แล้วสั่งให้เว็บโหลดตัวเองใหม่
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.warning(f"⚠️ ข้อมูลใน Firebase มีไม่ถึง {seq_len_i} แถว รอเซ็นเซอร์ส่งข้อมูลอีกนิดนะครับ")
+                    components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
+                    time.sleep(3)
+                    st.rerun()
+            else:
+                st.error("❌ ไม่พบข้อมูลใน Firebase หรือหา Node history ไม่เจอ")
+                components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
+                time.sleep(3)
+                st.rerun()
     else:
+        # ถ้ายกเลิกติ๊กถูก ก็จะหยุดดึงข้อมูล และโชว์หน้าจอปิด
+        st.sidebar.info("⏸️ ระบบหยุดดึงข้อมูลชั่วคราว ติ๊กถูกเพื่อดึงข้อมูลต่อ")
         components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
 
 # ==========================================
@@ -288,7 +299,6 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                 
                 if missing_cols:
                      st.error(f"❌ ไฟล์ CSV ขาดคอลัมน์พื้นฐาน: {', '.join(missing_cols)}")
-                     st.markdown("<br><br>", unsafe_allow_html=True)
                      components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
                 else:
                     mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
@@ -324,13 +334,12 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                         full_predictions = [None] * len(input_df)
                         
                     download_df['Predict_GRU_Indoor_PC0.1'] = full_predictions
-
                     csv_data = download_df.to_csv(index=False).encode('utf-8-sig') 
                     
                     st.sidebar.markdown("---")
-                    st.sidebar.success("✅ ประมวลผลโมเดล GRU เสร็จสิ้น!")
+                    st.sidebar.success("✅ ประมวลผลเสร็จสิ้น!")
                     st.sidebar.download_button(
-                        label="📥 ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
+                        label="📥 ดาวน์โหลดผลลัพธ์",
                         data=csv_data,
                         file_name=f"predicted_GRU_{uploaded_file.name}",
                         mime="text/csv",
@@ -350,8 +359,7 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                     components.html(html_content, height=1100, scrolling=True)
                     
             except Exception as e:
-                st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์หรือประมวลผล: {e}")
-                st.markdown("<br><br>", unsafe_allow_html=True)
+                st.error(f"เกิดข้อผิดพลาด: {e}")
                 components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
         else:
             components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
