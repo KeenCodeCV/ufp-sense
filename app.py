@@ -35,10 +35,11 @@ components.html(
 )
 
 # ==========================================
-# [ส่วนที่ 1: คลาสโมเดล] (แก้ไข Syntax Error แล้ว)
+# [ส่วนที่ 1: คลาสโมเดล]
 # ==========================================
 class SingleStepGRU(nn.Module):
-    def __init__(self, input_size: int = 8, hidden_size: int = 8, num_layers: int = 1):
+    # ปรับกลับเป็นรับ input_size ตัวแปร เพื่อให้ยืดหยุ่นตอนเรียกใช้
+    def __init__(self, input_size: int, hidden_size: int = 8, num_layers: int = 1):
         super(SingleStepGRU, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -47,7 +48,7 @@ class SingleStepGRU(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.gru(x, h0)
-        out = self.fc(out[:, -1, :]) # แก้ไขจาก out[:, -1, ) เป็น out[:, -1, :]
+        out = self.fc(out[:, -1, :]) # แก้ไข Syntax Error แล้ว
         return out
 
 class SingleStepRNN(nn.Module):
@@ -60,7 +61,7 @@ class SingleStepRNN(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.rnn(x, h0)
-        out = self.fc(out[:, -1, :]) # แก้ไขจาก out[:, -1, )
+        out = self.fc(out[:, -1, :])
         return out
 
 class SingleStepLSTM(nn.Module):
@@ -74,7 +75,7 @@ class SingleStepLSTM(nn.Module):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.LSTM(x, (h0, c0))
-        out = self.fc(out[:, -1, :]) # แก้ไขจาก out[:, -1, )
+        out = self.fc(out[:, -1, :])
         return out
 
 # ==========================================
@@ -90,16 +91,16 @@ def load_models():
         st.error(f" ไม่พบโฟลเดอร์ '{base_folder}' ในระบบ โปรดสร้างโฟลเดอร์และใส่ไฟล์โมเดล")
         return models, device
 
-    # --- 1. โหลด GRU (ปรับเป็น Seq=12, Features=8 ตามผลรันล่าสุด) ---
+    # --- 1. โหลด GRU ---
     try:
-        name_gru = "gru_latest" # ตรวจสอบชื่อไฟล์ให้ตรงกับไฟล์จริง
+        name_gru = "gru_latest" # ตรวจสอบชื่อไฟล์
         path_gru = os.path.join(base_folder, f"{name_gru}.pth")
         if os.path.exists(path_gru):
             with open(os.path.join(base_folder, f"{name_gru}_preprocessor.pkl"), 'rb') as f: prep_gru = pickle.load(f)
             with open(os.path.join(base_folder, f"{name_gru}_scaler.pkl"), 'rb') as f: y_scale_gru = pickle.load(f)
             
-            # โครงสร้างตรงกับสเปคล่าสุด
-            model_gru = SingleStepGRU(input_size=8, hidden_size=8, num_layers=1)
+            # โครงสร้างตรงกับสเปคจริง: รับ 6 ฟีเจอร์
+            model_gru = SingleStepGRU(input_size=6, hidden_size=8, num_layers=1)
             
             state_dict = torch.load(path_gru, map_location=device)
             if 'linear.weight' in state_dict:
@@ -114,7 +115,7 @@ def load_models():
             st.warning(f" หาไฟล์ GRU ไม่พบ: {path_gru}")
     except Exception as e: st.error(f"GRU Error: {e}")
 
-    # --- 2. โหลด RNN (Seq=24, Features=8) ---
+    # --- 2. โหลด RNN ---
     try:
         name_rnn = "rnn_Best_Model_20260306_164237"
         path_rnn = os.path.join(base_folder, f"{name_rnn}.pth")
@@ -130,7 +131,7 @@ def load_models():
             st.warning(f" หาไฟล์ RNN ไม่พบ: {path_rnn}")
     except Exception as e: st.error(f"RNN Error: {e}")
 
-    # --- 3. โหลด LSTM (Seq=42, Features=8) ---
+    # --- 3. โหลด LSTM ---
     try:
         name_lstm = "lstm_Best_Model_20260306_235311" 
         path_lstm = os.path.join(base_folder, f"{name_lstm}.pth")
@@ -237,12 +238,10 @@ if uploaded_file is not None:
             input_df = pd.read_csv(uploaded_file)
             original_cols = input_df.columns.tolist() 
             
-            # เตรียมคอลัมน์ cos/sin ล่วงหน้าสำหรับทุกโมเดล
             if 'Wind_Dir' in input_df.columns:
                 input_df['Wind_Dir_cos'] = np.cos(np.radians(input_df['Wind_Dir']))
                 input_df['Wind_Dir_sin'] = np.sin(np.radians(input_df['Wind_Dir']))
             
-            # เช็คว่าไฟล์มีคอลัมน์พื้นฐานครบไหม
             base_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
             missing_cols = [c for c in base_cols if c not in input_df.columns]
             
@@ -254,13 +253,15 @@ if uploaded_file is not None:
             else:
                 download_df = input_df[original_cols].copy() 
                 
-                # วนลูปทำนายให้ครบทุกโมเดล
                 for m_name in ["LSTM", "GRU", "RNN"]:
                     if m_name in models:
                         mod_i, prep_i, y_scaler_i, seq_len_i = models[m_name]
                         
-                        # ใช้ 8 คอลัมน์เหมือนกันสำหรับทุกโมเดล
-                        model_cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
+                        # แยกคอลัมน์ให้ตรงตามที่แต่ละโมเดลเทรนมา
+                        if m_name == "GRU":
+                            model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+                        else:
+                            model_cols = ['Wind_Dir_cos', 'Wind_Dir_sin', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Rain', 'Outdoor_PM2.5']
                         
                         if len(input_df) >= seq_len_i:
                             X_proc_all = prep_i.transform(input_df[model_cols])
