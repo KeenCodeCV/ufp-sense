@@ -24,7 +24,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# แก้ไข Title
 components.html(
     """<script>
         const targetTitle = 'UFP SENSE Dashboard';
@@ -120,7 +119,6 @@ def render_main_ui():
         with open("style.css", "r", encoding="utf-8") as f: css_content = f.read()
         with open("script.js", "r", encoding="utf-8") as f: js_content = f.read()
         
-        # 💡 [สำคัญมาก] แทรกสคริปต์เพื่อเปิดช่องทางให้ Python ยิงตัวเลขเข้ามาระหว่างทำงานได้
         magic_script = f"""
         <script>
             {js_content}
@@ -130,9 +128,8 @@ def render_main_ui():
         """
         return f"<style>{css_content}</style>{html_content}{magic_script}"
     except FileNotFoundError:
-        return "<h3 style='color:red;'>Error: ไม่พบไฟล์เว็บ</h3>"
+        return "<h3 style='color:red;'>Error: ไม่พบไฟล์เว็บ HTML/CSS/JS</h3>"
 
-# ฟังก์ชันนี้ใช้สำหรับ "ยิงตัวเลข" เข้าไปอัปเดตบนจอโดยไม่โหลดหน้าเว็บใหม่
 def inject_data_to_ui(pm01, pm25, temp, humid, wind_dir, ai_text):
     c_cur = [int(pm01*0.8), int(pm01*1.05), int(pm01*0.95), int(pm01*1.1), int(pm01*0.9), pm01]
     c_hr = [int(pm01*1.2), int(pm01*1.1), int(pm01*1.0), int(pm01*0.9), pm01]
@@ -165,26 +162,26 @@ st.sidebar.title("⚙️ Control Panel")
 app_mode = st.sidebar.radio("เลือกโหมด:", ("📡 โหมด Live (Firebase)", "📂 โหมด Test (Upload CSV)"))
 st.sidebar.markdown("---")
 
-# 1. แสดงหน้าเว็บของคุณทิ้งไว้ (แสดงแค่ครั้งเดียว จะไม่กระพริบอีกเลย)
+# โชว์โครงหน้าเว็บหลัก (โชว์แค่ครั้งเดียว ไม่โหลดใหม่)
 ui_container = st.container()
 with ui_container:
     components.html(render_main_ui(), height=1100, scrolling=True)
 
-# 2. เตรียมช่องทางลับสำหรับยิงข้อมูล
 injector_placeholder = st.empty()
 
+# ==========================================
+# โหมด Live (Firebase)
+# ==========================================
 if app_mode == "📡 โหมด Live (Firebase)":
     st.sidebar.markdown("**ระบบดึงข้อมูล Real-time อัตโนมัติ**")
-    
     start_btn = st.sidebar.button("▶️ เริ่มรันระบบ Live (Start)")
-    st.sidebar.markdown("*(หากต้องการหยุด ให้คลิกปุ่ม **Stop** ที่มุมขวาบนของจอ)*")
+    st.sidebar.markdown("*(หากต้องการหยุด ให้คลิกปุ่ม Stop มุมขวาบน)*")
 
     if start_btn:
         st.sidebar.success("📡 ระบบกำลังทำงานและแสดงผลต่อเนื่อง...")
         if gru_model_data is not None:
             mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
             
-            # ลูปอมตะ: รับค่า -> ทำนาย -> ยิงขึ้นจอ -> วนกลับไปรับค่าใหม่
             while True:
                 input_df = fetch_latest_firebase_data(limit=seq_len_i)
                 if not input_df.empty and len(input_df) >= seq_len_i:
@@ -210,45 +207,100 @@ if app_mode == "📡 โหมด Live (Firebase)":
                         wind_dir = round(last_row['Wind_Dir'], 2)
                         ai_text = generate_ai_insight(pred_val)
                         
-                        # ยิงข้อมูลตัวเลขใหม่เข้าไปในจอ (ไม่โหลดหน้าเว็บใหม่ ไม่ขาวแว๊บ)
                         with injector_placeholder:
                             components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text), height=0)
-                
-                # หน่วงเวลา 2 วินาที ก่อนวนลูปดึงข้อมูลรอบถัดไป
                 time.sleep(2)
         else:
-            st.error("โมเดลไม่พร้อมทำงาน")
+            st.sidebar.error("โมเดลไม่พร้อมทำงาน")
 
+# ==========================================
+# โหมด Test (Upload CSV) **กู้คืนระบบประมวลผลและดาวน์โหลดกลับมาแล้ว!**
+# ==========================================
 elif app_mode == "📂 โหมด Test (Upload CSV)":
     st.sidebar.markdown("**อัปโหลดไฟล์เพื่อทดสอบ**")
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ CSV", type=["csv"])
 
-    if uploaded_file is not None and gru_model_data is not None:
-        try:
-            input_df = pd.read_csv(uploaded_file)
-            mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
-            model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
-            
-            if len(input_df) >= seq_len_i:
-                X_proc_all = prep_i.transform(input_df[model_cols])
-                seq_tensor = torch.FloatTensor(np.array([X_proc_all[i : i + seq_len_i] for i in range(len(X_proc_all) - seq_len_i + 1)])).to(device)
+    if uploaded_file is not None:
+        if gru_model_data is not None:
+            try:
+                input_df = pd.read_csv(uploaded_file)
+                original_cols = input_df.columns.tolist() 
                 
-                mod_i.eval()
-                with torch.no_grad():
-                    out = mod_i(seq_tensor)
+                model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+                missing_cols = [c for c in model_cols if c not in input_df.columns]
                 
-                raw_preds = y_scaler_i.inverse_transform(out.cpu().numpy())
-                pred_val = int(raw_preds[-1][0] / 1000) 
-                
-                last_row = input_df.iloc[-1]
-                pm25 = round(last_row['Outdoor_PM2.5'], 2)
-                temp = round(last_row['Outdoor_Temperature'], 2)
-                humid = round(last_row['Outdoor_Humidity'], 2)
-                wind_dir = round(last_row['Wind_Dir'], 2)
-                ai_text = generate_ai_insight(pred_val)
-                
-                # ยิงข้อมูลทดสอบเข้าไปในจอ
-                with injector_placeholder:
-                    components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text), height=0)
-        except Exception as e:
-            pass
+                if missing_cols:
+                     st.sidebar.error(f"❌ ไฟล์ CSV ขาดคอลัมน์: {', '.join(missing_cols)}")
+                else:
+                    mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
+                    
+                    # 💡 คัดลอกตารางเพื่อเตรียมสร้างคอลัมน์ใหม่
+                    download_df = input_df[original_cols].copy() 
+                    
+                    if len(input_df) >= seq_len_i:
+                        X_proc_all = prep_i.transform(input_df[model_cols])
+                        
+                        # หั่นข้อมูลเป็นท่อนๆ สำหรับทำนาย
+                        sequences = []
+                        for i in range(len(X_proc_all) - seq_len_i + 1):
+                            sequences.append(X_proc_all[i : i + seq_len_i])
+                        
+                        seq_tensor = torch.FloatTensor(np.array(sequences)).to(device)
+                        
+                        preds_list = []
+                        chunk_size = 256
+                        mod_i.eval()
+                        with torch.no_grad():
+                            for i in range(0, len(seq_tensor), chunk_size):
+                                chunk = seq_tensor[i:i+chunk_size]
+                                out = mod_i(chunk)
+                                preds_list.append(out.cpu().numpy())
+                        
+                        if preds_list:
+                            preds_scaled = np.vstack(preds_list)
+                            raw_preds = y_scaler_i.inverse_transform(preds_scaled)
+                            preds_final = (raw_preds / 1000).flatten().astype(int)
+                        else:
+                            preds_final = np.array([])
+                        
+                        # เติมค่าว่างในช่วงแรก (Lookback)
+                        full_predictions = [None] * (seq_len_i - 1) + preds_final.tolist()
+                    else:
+                        full_predictions = [None] * len(input_df)
+                        
+                    # 💡 ยัดคอลัมน์ทำนายใส่ตาราง
+                    download_df['Predict_GRU_Indoor_PC0.1'] = full_predictions
+
+                    # แปลงไฟล์เพื่อเตรียมดาวน์โหลด
+                    csv_data = download_df.to_csv(index=False).encode('utf-8-sig') 
+                    
+                    st.sidebar.markdown("---")
+                    st.sidebar.success("✅ ประมวลผลเสร็จสิ้น!")
+                    
+                    # 💡 ปุ่มดาวน์โหลดกลับมาแล้ว!
+                    st.sidebar.download_button(
+                        label="📥 ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
+                        data=csv_data,
+                        file_name=f"predicted_GRU_{uploaded_file.name}",
+                        mime="text/csv",
+                    )
+
+                    # ดึงค่าแถวสุดท้ายเพื่อยิงขึ้นหน้าจอ
+                    last_pred = download_df.iloc[-1]['Predict_GRU_Indoor_PC0.1']
+                    pred_val = int(last_pred) if pd.notna(last_pred) else 0
+
+                    last_row = input_df.iloc[-1]
+                    pm25 = round(last_row['Outdoor_PM2.5'], 2)
+                    temp = round(last_row['Outdoor_Temperature'], 2)
+                    humid = round(last_row['Outdoor_Humidity'], 2)
+                    wind_dir = round(last_row['Wind_Dir'], 2)
+                    ai_text = generate_ai_insight(pred_val)
+                    
+                    # ยิงตัวเลขเข้าหน้าจอโดยไม่ต้องโหลดหน้าเว็บใหม่
+                    with injector_placeholder:
+                        components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text), height=0)
+                        
+            except Exception as e:
+                st.sidebar.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์หรือประมวลผล: {e}")
+        else:
+            st.sidebar.error("❌ โมเดลไม่พร้อมทำงาน")
