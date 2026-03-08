@@ -160,6 +160,13 @@ gru_model_data, device = load_models()
 
 st.sidebar.title("⚙️ Control Panel")
 app_mode = st.sidebar.radio("เลือกโหมด:", ("📡 โหมด Live (Firebase)", "📂 โหมด Test (Upload CSV)"))
+
+# 💡 [เพิ่มใหม่] นำปุ่ม Test และ Reset มาไว้ใน Control Panel
+st.sidebar.markdown("---")
+st.sidebar.markdown("**🛠️ เครื่องมือทดสอบหน้าจอ**")
+col1, col2 = st.sidebar.columns(2)
+btn_test = col1.button("▶️ Test", use_container_width=True)
+btn_reset = col2.button("🔄 Reset", use_container_width=True)
 st.sidebar.markdown("---")
 
 # โชว์โครงหน้าเว็บหลัก (โชว์แค่ครั้งเดียว ไม่โหลดใหม่)
@@ -169,13 +176,22 @@ with ui_container:
 
 injector_placeholder = st.empty()
 
+# 💡 จัดการเมื่อกดปุ่ม Test หรือ Reset จาก Control Panel
+if btn_test:
+    with injector_placeholder:
+        # เปลี่ยนจาก testSystem() เป็น startTestMode() ให้ตรงกับ JS ของคุณ
+        components.html("""<script>if(window.parent.myDashboardWin && window.parent.myDashboardWin.startTestMode) window.parent.myDashboardWin.startTestMode();</script>""", height=0)
+
+if btn_reset:
+    with injector_placeholder:
+        components.html("""<script>if(window.parent.myDashboardWin && window.parent.myDashboardWin.resetSystem) window.parent.myDashboardWin.resetSystem();</script>""", height=0)
+
 # ==========================================
 # โหมด Live (Firebase)
 # ==========================================
 if app_mode == "📡 โหมด Live (Firebase)":
-    st.sidebar.markdown("**ระบบดึงข้อมูล Real-time อัตโนมัติ**")
-    start_btn = st.sidebar.button("▶️ เริ่มรันระบบ Live (Start)")
-    st.sidebar.markdown("*(หากต้องการหยุด ให้คลิกปุ่ม Stop มุมขวาบน)*")
+    start_btn = st.sidebar.button("🚀 เริ่มรันระบบ Live (Start)", type="primary", use_container_width=True)
+    st.sidebar.markdown("*(คลิกปุ่ม **Stop** มุมขวาบนเพื่อหยุดดึงข้อมูล)*")
 
     if start_btn:
         st.sidebar.success("📡 ระบบกำลังทำงานและแสดงผลต่อเนื่อง...")
@@ -214,10 +230,9 @@ if app_mode == "📡 โหมด Live (Firebase)":
             st.sidebar.error("โมเดลไม่พร้อมทำงาน")
 
 # ==========================================
-# โหมด Test (Upload CSV) **กู้คืนระบบประมวลผลและดาวน์โหลดกลับมาแล้ว!**
+# โหมด Test (Upload CSV) 
 # ==========================================
 elif app_mode == "📂 โหมด Test (Upload CSV)":
-    st.sidebar.markdown("**อัปโหลดไฟล์เพื่อทดสอบ**")
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ CSV", type=["csv"])
 
     if uploaded_file is not None:
@@ -233,14 +248,10 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                      st.sidebar.error(f"❌ ไฟล์ CSV ขาดคอลัมน์: {', '.join(missing_cols)}")
                 else:
                     mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
-                    
-                    # 💡 คัดลอกตารางเพื่อเตรียมสร้างคอลัมน์ใหม่
                     download_df = input_df[original_cols].copy() 
                     
                     if len(input_df) >= seq_len_i:
                         X_proc_all = prep_i.transform(input_df[model_cols])
-                        
-                        # หั่นข้อมูลเป็นท่อนๆ สำหรับทำนาย
                         sequences = []
                         for i in range(len(X_proc_all) - seq_len_i + 1):
                             sequences.append(X_proc_all[i : i + seq_len_i])
@@ -263,29 +274,22 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                         else:
                             preds_final = np.array([])
                         
-                        # เติมค่าว่างในช่วงแรก (Lookback)
                         full_predictions = [None] * (seq_len_i - 1) + preds_final.tolist()
                     else:
                         full_predictions = [None] * len(input_df)
                         
-                    # 💡 ยัดคอลัมน์ทำนายใส่ตาราง
                     download_df['Predict_GRU_Indoor_PC0.1'] = full_predictions
-
-                    # แปลงไฟล์เพื่อเตรียมดาวน์โหลด
                     csv_data = download_df.to_csv(index=False).encode('utf-8-sig') 
                     
-                    st.sidebar.markdown("---")
                     st.sidebar.success("✅ ประมวลผลเสร็จสิ้น!")
-                    
-                    # 💡 ปุ่มดาวน์โหลดกลับมาแล้ว!
                     st.sidebar.download_button(
                         label="📥 ดาวน์โหลดไฟล์ผลลัพธ์ (CSV)",
                         data=csv_data,
                         file_name=f"predicted_GRU_{uploaded_file.name}",
                         mime="text/csv",
+                        use_container_width=True
                     )
 
-                    # ดึงค่าแถวสุดท้ายเพื่อยิงขึ้นหน้าจอ
                     last_pred = download_df.iloc[-1]['Predict_GRU_Indoor_PC0.1']
                     pred_val = int(last_pred) if pd.notna(last_pred) else 0
 
@@ -296,7 +300,6 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                     wind_dir = round(last_row['Wind_Dir'], 2)
                     ai_text = generate_ai_insight(pred_val)
                     
-                    # ยิงตัวเลขเข้าหน้าจอโดยไม่ต้องโหลดหน้าเว็บใหม่
                     with injector_placeholder:
                         components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text), height=0)
                         
