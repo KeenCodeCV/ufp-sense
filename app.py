@@ -214,7 +214,7 @@ if app_mode == "📡 โหมด Live (Firebase)":
                 # ดึงประวัติค่าจาก Firebase (2,000 แถวล่าสุด) มาปูเป็นฐานกราฟก่อน
                 ref_hist = db.reference(FIREBASE_NODE_NAME).order_by_key().limit_to_last(2000).get()
                 if ref_hist:
-                    history_pm01 = [float(v.get('indoor_pc01_raw', 0)) for k, v in ref_hist.items() if 'indoor_pc01_raw' in v]
+                    history_pm01 = [int(float(v.get('indoor_pc01_raw', 0)) / 1000) for k, v in ref_hist.items() if 'indoor_pc01_raw' in v]
             except: pass
             
             while True:
