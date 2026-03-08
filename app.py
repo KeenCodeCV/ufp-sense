@@ -6,6 +6,7 @@ import pickle
 import pandas as pd
 import numpy as np
 import os
+import time
 import firebase_admin
 from firebase_admin import credentials, db
 
@@ -15,24 +16,21 @@ st.set_page_config(
     layout="wide"
 )
 
+# ซ่อน UI ของ Streamlit
+st.markdown("""
+    <style>
+        .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
+        #MainMenu {visibility: hidden;} footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
+# แก้ไข Title
 components.html(
-    """
-    <script>
+    """<script>
         const targetTitle = 'UFP SENSE Dashboard';
         const titleEl = window.parent.document.querySelector('title');
-        if (titleEl) {
-            titleEl.innerText = targetTitle;
-            const observer = new MutationObserver(() => {
-                if (titleEl.innerText !== targetTitle) {
-                    titleEl.innerText = targetTitle;
-                }
-            });
-            observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
-        }
-    </script>
-    """,
-    height=0,
-    width=0,
+        if (titleEl) titleEl.innerText = targetTitle;
+    </script>""", height=0, width=0
 )
 
 # ==========================================
@@ -54,11 +52,8 @@ if not firebase_admin._apps:
             cred = None
             
         if cred:
-            firebase_admin.initialize_app(cred, {
-                'databaseURL': FIREBASE_DATABASE_URL
-            })
-    except Exception as e:
-        st.sidebar.error(f"❌ เชื่อมต่อ Firebase ไม่สำเร็จ: {e}")
+            firebase_admin.initialize_app(cred, {'databaseURL': FIREBASE_DATABASE_URL})
+    except Exception as e: pass
 
 def fetch_latest_firebase_data(limit=12):
     try:
@@ -67,8 +62,7 @@ def fetch_latest_firebase_data(limit=12):
         if data:
             records = [val for key, val in data.items()]
             return pd.DataFrame(records)
-    except Exception as e:
-        st.error(f"❌ ดึงข้อมูลผิดพลาด: {e}")
+    except Exception as e: pass
     return pd.DataFrame()
 
 # ==========================================
@@ -87,243 +81,174 @@ class SingleStepGRU(nn.Module):
         out = self.fc(out[:, -1, :]) 
         return out
 
-# ==========================================
-# [ส่วนที่ 2: ฟังก์ชันโหลดโมเดล GRU]
-# ==========================================
 @st.cache_resource
 def load_models():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     base_folder = "models"
     model_data = None
-    
-    if not os.path.exists(base_folder):
-        st.error(f"❌ ไม่พบโฟลเดอร์ '{base_folder}'")
-        return model_data, device
-
-    try:
-        name_gru = "gru_latest" 
-        path_gru = os.path.join(base_folder, f"{name_gru}.pth")
-        
-        if os.path.exists(path_gru):
-            with open(os.path.join(base_folder, f"{name_gru}_preprocessor.pkl"), 'rb') as f: prep_gru = pickle.load(f)
-            with open(os.path.join(base_folder, f"{name_gru}_scaler.pkl"), 'rb') as f: y_scale_gru = pickle.load(f)
-            
-            model_gru = SingleStepGRU(input_size=6, hidden_size=8, num_layers=1)
-            
-            state_dict = torch.load(path_gru, map_location=device)
-            if 'linear.weight' in state_dict: state_dict['fc.weight'] = state_dict.pop('linear.weight')
-            if 'linear.bias' in state_dict: state_dict['fc.bias'] = state_dict.pop('linear.bias')
+    if os.path.exists(base_folder):
+        try:
+            name_gru = "gru_latest" 
+            path_gru = os.path.join(base_folder, f"{name_gru}.pth")
+            if os.path.exists(path_gru):
+                with open(os.path.join(base_folder, f"{name_gru}_preprocessor.pkl"), 'rb') as f: prep_gru = pickle.load(f)
+                with open(os.path.join(base_folder, f"{name_gru}_scaler.pkl"), 'rb') as f: y_scale_gru = pickle.load(f)
                 
-            model_gru.load_state_dict(state_dict, strict=False)
-            model_gru.to(device).eval()
-            model_data = (model_gru, prep_gru, y_scale_gru, 12) 
-    except Exception as e: 
-        st.error(f"GRU Error: {e}")
-    
+                model_gru = SingleStepGRU(input_size=6, hidden_size=8, num_layers=1)
+                state_dict = torch.load(path_gru, map_location=device)
+                if 'linear.weight' in state_dict: state_dict['fc.weight'] = state_dict.pop('linear.weight')
+                if 'linear.bias' in state_dict: state_dict['fc.bias'] = state_dict.pop('linear.bias')
+                    
+                model_gru.load_state_dict(state_dict, strict=False)
+                model_gru.to(device).eval()
+                model_data = (model_gru, prep_gru, y_scale_gru, 12) 
+        except Exception as e: pass
     return model_data, device
 
-# ==========================================
-# [ส่วนฟังก์ชัน สร้าง AI Insight]
-# ==========================================
-def generate_ai_insight(pm01, pm25, wind_speed, temp, humid):
-    if pm01 >= 20000:
-        return "Hazardous air conditions detected. Please remain indoors, keep all windows closed, and use high-efficiency air purifiers immediately."
-    elif pm01 >= 10000:
-        return "Air quality is noticeably reduced. It is highly recommended to turn on air purifiers and minimize outdoor activities."
-    elif pm01 >= 1000:
-        return "Air quality is acceptable. However, sensitive individuals should monitor for any discomfort and consider limiting prolonged outdoor exertion."
-    else:
-        return "The air quality is excellent. The environment is safe, making it a great time for normal activities and natural ventilation."
+def generate_ai_insight(pm01):
+    if pm01 >= 20000: return "Hazardous air conditions detected. Please remain indoors and use air purifiers."
+    elif pm01 >= 10000: return "Air quality is noticeably reduced. Turn on air purifiers."
+    elif pm01 >= 1000: return "Air quality is acceptable. Sensitive individuals should monitor for discomfort."
+    else: return "The air quality is excellent. Safe for normal activities."
 
 # ==========================================
-# [ส่วนที่ 3: ฟังก์ชันอ่านไฟล์เว็บหน้าตาเดิมของคุณ]
+# [ส่วนที่ 2: ฟังก์ชันสร้างหน้าเว็บ (โหลดครั้งเดียว)]
 # ==========================================
-def render_web_interface(pm01_val, pm25_val, temp_val, humid_val, wind_val, wind_speed, is_active):
+def render_main_ui():
     try:
         with open("index.html", "r", encoding="utf-8") as f: html_content = f.read()
         with open("style.css", "r", encoding="utf-8") as f: css_content = f.read()
         with open("script.js", "r", encoding="utf-8") as f: js_content = f.read()
-    except FileNotFoundError:
-        return "<h3 style='color:red; text-align:center;'>Error: ไม่พบไฟล์ HTML/CSS/JS</h3>"
-
-    if not is_active:
-        injection_script = f"<script>{js_content}\n setTimeout(function() {{ if(window.resetSystem) window.resetSystem(); }}, 500);</script>"
-    else:
-        ai_text = generate_ai_insight(pm01_val, pm25_val, wind_speed, temp_val, humid_val)
-        chart_current = [int(pm01_val*0.8), int(pm01_val*1.05), int(pm01_val*0.95), int(pm01_val*1.1), int(pm01_val*0.9), pm01_val]
-        chart_hour = [int(pm01_val*1.2), int(pm01_val*1.1), int(pm01_val*1.0), int(pm01_val*0.9), pm01_val]
-        chart_day = [int(pm01_val*0.6), int(pm01_val*0.8), int(pm01_val*1.4), int(pm01_val*1.2), int(pm01_val*0.9), int(pm01_val*1.1), pm01_val]
         
-        injection_script = f"""
+        # 💡 [สำคัญมาก] แทรกสคริปต์เพื่อเปิดช่องทางให้ Python ยิงตัวเลขเข้ามาระหว่างทำงานได้
+        magic_script = f"""
         <script>
-            {js_content} 
-            setTimeout(function() {{
-                if(window.updateStatus) window.updateStatus({pm01_val}, "{ai_text}");
-                if(window.updateWindDirection) window.updateWindDirection({wind_val});
-                if(window.updateCharts) window.updateCharts({chart_current}, {chart_hour}, {chart_day});
-                
-                var pm25Elem = document.getElementById('val-pm25');
-                var tempElem = document.getElementById('val-temp');
-                var humidElem = document.getElementById('val-humid');
-                var modelElem = document.getElementById('modelNameDisplay');
-                
-                if(pm25Elem) pm25Elem.innerText = '{pm25_val}';
-                if(tempElem) tempElem.innerText = '{temp_val}';
-                if(humidElem) humidElem.innerText = '{humid_val}';
-                if(modelElem) modelElem.innerText = 'Predicted by GRU Model';
-            }}, 500);
+            {js_content}
+            window.parent.myDashboardWin = window;
+            window.parent.myDashboardDoc = document;
         </script>
         """
+        return f"<style>{css_content}</style>{html_content}{magic_script}"
+    except FileNotFoundError:
+        return "<h3 style='color:red;'>Error: ไม่พบไฟล์เว็บ</h3>"
 
-    return f"<style>{css_content}</style>{html_content}{injection_script}"
+# ฟังก์ชันนี้ใช้สำหรับ "ยิงตัวเลข" เข้าไปอัปเดตบนจอโดยไม่โหลดหน้าเว็บใหม่
+def inject_data_to_ui(pm01, pm25, temp, humid, wind_dir, ai_text):
+    c_cur = [int(pm01*0.8), int(pm01*1.05), int(pm01*0.95), int(pm01*1.1), int(pm01*0.9), pm01]
+    c_hr = [int(pm01*1.2), int(pm01*1.1), int(pm01*1.0), int(pm01*0.9), pm01]
+    c_day = [int(pm01*0.6), int(pm01*0.8), int(pm01*1.4), int(pm01*1.2), int(pm01*0.9), int(pm01*1.1), pm01]
+    
+    return f"""
+    <script>
+        var win = window.parent.myDashboardWin;
+        var doc = window.parent.myDashboardDoc;
+        
+        if(win && doc) {{
+            if(win.updateStatus) win.updateStatus({pm01}, "{ai_text}");
+            if(win.updateWindDirection) win.updateWindDirection({wind_dir});
+            if(win.updateCharts) win.updateCharts({c_cur}, {c_hr}, {c_day});
+            
+            if(doc.getElementById('val-pm25')) doc.getElementById('val-pm25').innerText = '{pm25}';
+            if(doc.getElementById('val-temp')) doc.getElementById('val-temp').innerText = '{temp}';
+            if(doc.getElementById('val-humid')) doc.getElementById('val-humid').innerText = '{humid}';
+            if(doc.getElementById('modelNameDisplay')) doc.getElementById('modelNameDisplay').innerText = 'Live Predicted by GRU Model';
+        }}
+    </script>
+    """
 
 # ==========================================
-# [ส่วนที่ 4: Streamlit UI]
+# [ส่วนที่ 3: ระบบการทำงาน (Streamlit UI)]
 # ==========================================
-st.markdown("""
-    <style>
-        .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
-        #MainMenu {visibility: hidden;} 
-        footer {visibility: hidden;}
-        [data-testid="stAppDeployButton"] {display: none !important;}
-        .viewerBadge_container {display: none !important;}
-        .viewerBadge_link {display: none !important;}
-        div[data-testid="stAlert"] { margin-top: -15px !important; padding: 10px !important; }
-    </style>
-""", unsafe_allow_html=True)
-
 gru_model_data, device = load_models()
 
 st.sidebar.title("⚙️ Control Panel")
-app_mode = st.sidebar.radio(
-    "เลือกโหมดการทำงาน:",
-    ("📡 โหมด Live (Firebase)", "📂 โหมด Test (Upload CSV)")
-)
-
+app_mode = st.sidebar.radio("เลือกโหมด:", ("📡 โหมด Live (Firebase)", "📂 โหมด Test (Upload CSV)"))
 st.sidebar.markdown("---")
 
-# ==========================================
-# โหมดที่ 1: Live (Firebase) แบบกดปุ่มอัปเดตเอง
-# ==========================================
-if app_mode == "📡 โหมด Live (Firebase)":
-    st.sidebar.markdown("**ดึงข้อมูลสดจากเซ็นเซอร์**")
-    
-    # กลับมาใช้ปุ่มกดดึงข้อมูลตามเดิม
-    fetch_button = st.sidebar.button("🔄 ดึงข้อมูลล่าสุด (Fetch Data)", type="primary")
+# 1. แสดงหน้าเว็บของคุณทิ้งไว้ (แสดงแค่ครั้งเดียว จะไม่กระพริบอีกเลย)
+ui_container = st.container()
+with ui_container:
+    components.html(render_main_ui(), height=1100, scrolling=True)
 
-    if fetch_button:
+# 2. เตรียมช่องทางลับสำหรับยิงข้อมูล
+injector_placeholder = st.empty()
+
+if app_mode == "📡 โหมด Live (Firebase)":
+    st.sidebar.markdown("**ระบบดึงข้อมูล Real-time อัตโนมัติ**")
+    
+    start_btn = st.sidebar.button("▶️ เริ่มรันระบบ Live (Start)")
+    st.sidebar.markdown("*(หากต้องการหยุด ให้คลิกปุ่ม **Stop** ที่มุมขวาบนของจอ)*")
+
+    if start_btn:
+        st.sidebar.success("📡 ระบบกำลังทำงานและแสดงผลต่อเนื่อง...")
         if gru_model_data is not None:
-            with st.spinner('📡 กำลังดึงข้อมูล...'):
-                mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
+            mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
+            
+            # ลูปอมตะ: รับค่า -> ทำนาย -> ยิงขึ้นจอ -> วนกลับไปรับค่าใหม่
+            while True:
                 input_df = fetch_latest_firebase_data(limit=seq_len_i)
-                
-                if not input_df.empty:
-                    rename_map = {
-                        'wind_dir': 'Wind_Dir', 'wind_speed': 'Wind_Speed', 'outdoor_temp': 'Outdoor_Temperature',
-                        'outdoor_hum': 'Outdoor_Humidity', 'bar': 'Bar', 'outdoor_pm25': 'Outdoor_PM2.5'
-                    }
+                if not input_df.empty and len(input_df) >= seq_len_i:
+                    rename_map = {'wind_dir': 'Wind_Dir', 'wind_speed': 'Wind_Speed', 'outdoor_temp': 'Outdoor_Temperature', 
+                                  'outdoor_hum': 'Outdoor_Humidity', 'bar': 'Bar', 'outdoor_pm25': 'Outdoor_PM2.5'}
                     input_df = input_df.rename(columns=rename_map)
                     model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
                     
-                    if len(input_df) >= seq_len_i:
+                    if all(col in input_df.columns for col in model_cols):
                         X_proc_all = prep_i.transform(input_df[model_cols])
                         seq_tensor = torch.FloatTensor(X_proc_all).unsqueeze(0).to(device) 
                         
                         mod_i.eval()
-                        with torch.no_grad():
-                            out = mod_i(seq_tensor)
+                        with torch.no_grad(): out = mod_i(seq_tensor)
                         
                         raw_pred = y_scaler_i.inverse_transform(out.cpu().numpy())
                         pred_val = int(raw_pred[0][0] / 1000) 
                         
                         last_row = input_df.iloc[-1]
-                        pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
-                        temp_disp = round(last_row['Outdoor_Temperature'], 2)
-                        humid_disp = round(last_row['Outdoor_Humidity'], 2)
-                        wind_spd = round(last_row['Wind_Speed'], 2)
-                        wind_disp = round(last_row['Wind_Dir'], 2)
+                        pm25 = round(last_row['Outdoor_PM2.5'], 2)
+                        temp = round(last_row['Outdoor_Temperature'], 2)
+                        humid = round(last_row['Outdoor_Humidity'], 2)
+                        wind_dir = round(last_row['Wind_Dir'], 2)
+                        ai_text = generate_ai_insight(pred_val)
                         
-                        st.sidebar.success("✅ อัปเดตข้อมูลสำเร็จ!")
-                        html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, True)
-                        components.html(html_content, height=1100, scrolling=True)
-                    else:
-                        st.warning(f"⚠️ ข้อมูลใน Firebase ยังไม่ครบ {seq_len_i} แถว")
-                        components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
-                else:
-                    st.error("❌ ไม่พบข้อมูลใน Firebase")
-                    components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
+                        # ยิงข้อมูลตัวเลขใหม่เข้าไปในจอ (ไม่โหลดหน้าเว็บใหม่ ไม่ขาวแว๊บ)
+                        with injector_placeholder:
+                            components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text), height=0)
+                
+                # หน่วงเวลา 2 วินาที ก่อนวนลูปดึงข้อมูลรอบถัดไป
+                time.sleep(2)
         else:
-            components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
-    else:
-        components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
+            st.error("โมเดลไม่พร้อมทำงาน")
 
-# ==========================================
-# โหมดที่ 2: Test (Upload CSV)
-# ==========================================
 elif app_mode == "📂 โหมด Test (Upload CSV)":
     st.sidebar.markdown("**อัปโหลดไฟล์เพื่อทดสอบ**")
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ CSV", type=["csv"])
 
-    if uploaded_file is not None:
-        if gru_model_data is not None:
-            try:
-                input_df = pd.read_csv(uploaded_file)
-                original_cols = input_df.columns.tolist() 
-                model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+    if uploaded_file is not None and gru_model_data is not None:
+        try:
+            input_df = pd.read_csv(uploaded_file)
+            mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
+            model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+            
+            if len(input_df) >= seq_len_i:
+                X_proc_all = prep_i.transform(input_df[model_cols])
+                seq_tensor = torch.FloatTensor(np.array([X_proc_all[i : i + seq_len_i] for i in range(len(X_proc_all) - seq_len_i + 1)])).to(device)
                 
-                mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
-                download_df = input_df[original_cols].copy() 
+                mod_i.eval()
+                with torch.no_grad():
+                    out = mod_i(seq_tensor)
                 
-                if len(input_df) >= seq_len_i:
-                    X_proc_all = prep_i.transform(input_df[model_cols])
-                    sequences = [X_proc_all[i : i + seq_len_i] for i in range(len(X_proc_all) - seq_len_i + 1)]
-                    seq_tensor = torch.FloatTensor(np.array(sequences)).to(device)
-                    
-                    preds_list = []
-                    mod_i.eval()
-                    with torch.no_grad():
-                        for i in range(0, len(seq_tensor), 256):
-                            chunk = seq_tensor[i:i+256]
-                            preds_list.append(mod_i(chunk).cpu().numpy())
-                    
-                    if preds_list:
-                        preds_scaled = np.vstack(preds_list)
-                        raw_preds = y_scaler_i.inverse_transform(preds_scaled)
-                        preds_final = (raw_preds / 1000).flatten().astype(int)
-                    else:
-                        preds_final = np.array([])
-                    
-                    full_predictions = [None] * (seq_len_i - 1) + preds_final.tolist()
-                else:
-                    full_predictions = [None] * len(input_df)
-                    
-                download_df['Predict_GRU_Indoor_PC0.1'] = full_predictions
-                csv_data = download_df.to_csv(index=False).encode('utf-8-sig') 
+                raw_preds = y_scaler_i.inverse_transform(out.cpu().numpy())
+                pred_val = int(raw_preds[-1][0] / 1000) 
                 
-                st.sidebar.markdown("---")
-                st.sidebar.success("✅ ประมวลผลเสร็จสิ้น!")
-                st.sidebar.download_button(
-                    label="📥 ดาวน์โหลดไฟล์ผลลัพธ์",
-                    data=csv_data,
-                    file_name=f"predicted_{uploaded_file.name}",
-                    mime="text/csv",
-                )
-
-                last_pred = download_df.iloc[-1]['Predict_GRU_Indoor_PC0.1']
-                pred_val = int(last_pred) if pd.notna(last_pred) else 0
-
                 last_row = input_df.iloc[-1]
-                pm25_disp = round(last_row['Outdoor_PM2.5'], 2)
-                temp_disp = round(last_row['Outdoor_Temperature'], 2)
-                humid_disp = round(last_row['Outdoor_Humidity'], 2)
-                wind_spd = round(last_row['Wind_Speed'], 2)
-                wind_disp = round(last_row['Wind_Dir'], 2)
+                pm25 = round(last_row['Outdoor_PM2.5'], 2)
+                temp = round(last_row['Outdoor_Temperature'], 2)
+                humid = round(last_row['Outdoor_Humidity'], 2)
+                wind_dir = round(last_row['Wind_Dir'], 2)
+                ai_text = generate_ai_insight(pred_val)
                 
-                html_content = render_web_interface(pred_val, pm25_disp, temp_disp, humid_disp, wind_disp, wind_spd, True)
-                components.html(html_content, height=1100, scrolling=True)
-                
-            except Exception as e:
-                st.error(f"เกิดข้อผิดพลาด: {e}")
-                components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
-    else:
-        components.html(render_web_interface(0, 0, 0, 0, 0, 0, False), height=1100, scrolling=True)
+                # ยิงข้อมูลทดสอบเข้าไปในจอ
+                with injector_placeholder:
+                    components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text), height=0)
+        except Exception as e:
+            pass
