@@ -111,7 +111,7 @@ def generate_ai_insight(pm01):
     else: return "The air quality is excellent. Safe for normal activities."
 
 # ==========================================
-# [ส่วนที่ 2: ฟังก์ชันสร้างหน้าเว็บ (โหลดครั้งเดียว)]
+# [ส่วนที่ 2: ฟังก์ชันสร้างหน้าเว็บและอัปเดตกราฟ]
 # ==========================================
 def render_main_ui():
     try:
@@ -130,11 +130,8 @@ def render_main_ui():
     except FileNotFoundError:
         return "<h3 style='color:red;'>Error: ไม่พบไฟล์เว็บ HTML/CSS/JS</h3>"
 
-def inject_data_to_ui(pm01, pm25, temp, humid, wind_dir, ai_text):
-    c_cur = [int(pm01*0.8), int(pm01*1.05), int(pm01*0.95), int(pm01*1.1), int(pm01*0.9), pm01]
-    c_hr = [int(pm01*1.2), int(pm01*1.1), int(pm01*1.0), int(pm01*0.9), pm01]
-    c_day = [int(pm01*0.6), int(pm01*0.8), int(pm01*1.4), int(pm01*1.2), int(pm01*0.9), int(pm01*1.1), pm01]
-    
+# 💡 [เปลี่ยนใหม่] รับค่าอาร์เรย์กราฟของจริงเข้ามา (c_cur, c_hr, c_day) แทนการคำนวณหลอกๆ
+def inject_data_to_ui(pm01, pm25, temp, humid, wind_dir, ai_text, c_cur, c_hr, c_day):
     return f"""
     <script>
         var win = window.parent.myDashboardWin;
@@ -153,6 +150,23 @@ def inject_data_to_ui(pm01, pm25, temp, humid, wind_dir, ai_text):
     </script>
     """
 
+# 💡 ฟังก์ชันใหม่: เอาไว้คำนวณหาค่าเฉลี่ยของกราฟจากประวัติที่มีอยู่จริง
+def calculate_trend(data_list, points_needed):
+    if not data_list: return [0] * points_needed
+    # ถ้าข้อมูลยังมีไม่พอ ให้ก๊อปปี้ค่าแรกสุดมาเติมให้เต็มกราฟไปก่อน
+    if len(data_list) < points_needed:
+        return [int(data_list[0])] * (points_needed - len(data_list)) + [int(x) for x in data_list]
+    
+    # หั่นข้อมูลออกเป็นท่อนๆ เท่าๆ กัน แล้วหาค่าเฉลี่ย
+    chunk_size = len(data_list) // points_needed
+    data_to_use = data_list[-(points_needed * chunk_size):]
+    
+    result = []
+    for i in range(points_needed):
+        chunk = data_to_use[i * chunk_size : (i + 1) * chunk_size]
+        result.append(int(sum(chunk) / len(chunk)))
+    return result
+
 # ==========================================
 # [ส่วนที่ 3: ระบบการทำงาน (Streamlit UI)]
 # ==========================================
@@ -161,7 +175,6 @@ gru_model_data, device = load_models()
 st.sidebar.title("⚙️ Control Panel")
 app_mode = st.sidebar.radio("เลือกโหมด:", ("📡 โหมด Live (Firebase)", "📂 โหมด Test (Upload CSV)"))
 
-# 💡 [เพิ่มใหม่] นำปุ่ม Test และ Reset มาไว้ใน Control Panel
 st.sidebar.markdown("---")
 st.sidebar.markdown("**🛠️ เครื่องมือทดสอบหน้าจอ**")
 col1, col2 = st.sidebar.columns(2)
@@ -169,17 +182,14 @@ btn_test = col1.button("▶️ Test", use_container_width=True)
 btn_reset = col2.button("🔄 Reset", use_container_width=True)
 st.sidebar.markdown("---")
 
-# โชว์โครงหน้าเว็บหลัก (โชว์แค่ครั้งเดียว ไม่โหลดใหม่)
 ui_container = st.container()
 with ui_container:
     components.html(render_main_ui(), height=1100, scrolling=True)
 
 injector_placeholder = st.empty()
 
-# 💡 จัดการเมื่อกดปุ่ม Test หรือ Reset จาก Control Panel
 if btn_test:
     with injector_placeholder:
-        # เปลี่ยนจาก testSystem() เป็น startTestMode() ให้ตรงกับ JS ของคุณ
         components.html("""<script>if(window.parent.myDashboardWin && window.parent.myDashboardWin.startTestMode) window.parent.myDashboardWin.startTestMode();</script>""", height=0)
 
 if btn_reset:
@@ -197,6 +207,15 @@ if app_mode == "📡 โหมด Live (Firebase)":
         st.sidebar.success("📡 ระบบกำลังทำงานและแสดงผลต่อเนื่อง...")
         if gru_model_data is not None:
             mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
+            
+            # 💡 สร้างถังเก็บข้อมูลจริงก่อนเริ่มรัน
+            history_pm01 = []
+            try:
+                # ดึงประวัติค่าจาก Firebase (2,000 แถวล่าสุด) มาปูเป็นฐานกราฟก่อน
+                ref_hist = db.reference(FIREBASE_NODE_NAME).order_by_key().limit_to_last(2000).get()
+                if ref_hist:
+                    history_pm01 = [float(v.get('indoor_pc01_raw', 0)) for k, v in ref_hist.items() if 'indoor_pc01_raw' in v]
+            except: pass
             
             while True:
                 input_df = fetch_latest_firebase_data(limit=seq_len_i)
@@ -216,6 +235,18 @@ if app_mode == "📡 โหมด Live (Firebase)":
                         raw_pred = y_scaler_i.inverse_transform(out.cpu().numpy())
                         pred_val = int(raw_pred[0][0] / 1000) 
                         
+                        # 💡 เอาค่าที่ทำนายได้ใหม่ ยัดใส่ถังประวัติ
+                        history_pm01.append(pred_val)
+                        
+                        # 💡 กันไม่ให้แรกล้น (เก็บสูงสุด 28,800 ข้อมูล = เท่ากับดึง 24 ชั่วโมง)
+                        if len(history_pm01) > 28800:
+                            history_pm01.pop(0)
+                        
+                        # 💡 สร้างอาร์เรย์ส่งให้กราฟ โดยคำนวณจากประวัติจริงๆ
+                        c_cur = calculate_trend(history_pm01[-6:], 6) # กราฟ 1: เอา 6 ค่าล่าสุดมาโชว์
+                        c_hr = calculate_trend(history_pm01[-1200:], 5) # กราฟ 2: ค่าเฉลี่ยรายชั่วโมง (ประมาณ 1200 จุด)
+                        c_day = calculate_trend(history_pm01[-28800:], 7) # กราฟ 3: ค่าเฉลี่ยรายวัน
+                        
                         last_row = input_df.iloc[-1]
                         pm25 = round(last_row['Outdoor_PM2.5'], 2)
                         temp = round(last_row['Outdoor_Temperature'], 2)
@@ -223,8 +254,9 @@ if app_mode == "📡 โหมด Live (Firebase)":
                         wind_dir = round(last_row['Wind_Dir'], 2)
                         ai_text = generate_ai_insight(pred_val)
                         
+                        # ยิงข้อมูลและกราฟจริงขึ้นจอ
                         with injector_placeholder:
-                            components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text), height=0)
+                            components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text, c_cur, c_hr, c_day), height=0)
                 time.sleep(2)
         else:
             st.sidebar.error("โมเดลไม่พร้อมทำงาน")
@@ -290,6 +322,12 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                         use_container_width=True
                     )
 
+                    # 💡 กราฟในโหมด CSV ก็คำนวณจากค่าจริงในไฟล์ CSV ด้วย!
+                    csv_preds = [int(p) for p in full_predictions if pd.notna(p)]
+                    c_cur = calculate_trend(csv_preds[-6:], 6) if csv_preds else [0]*6
+                    c_hr = calculate_trend(csv_preds[-1200:], 5) if csv_preds else [0]*5
+                    c_day = calculate_trend(csv_preds[-28800:], 7) if csv_preds else [0]*7
+
                     last_pred = download_df.iloc[-1]['Predict_GRU_Indoor_PC0.1']
                     pred_val = int(last_pred) if pd.notna(last_pred) else 0
 
@@ -301,7 +339,7 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                     ai_text = generate_ai_insight(pred_val)
                     
                     with injector_placeholder:
-                        components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text), height=0)
+                        components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text, c_cur, c_hr, c_day), height=0)
                         
             except Exception as e:
                 st.sidebar.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์หรือประมวลผล: {e}")
