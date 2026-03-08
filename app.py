@@ -200,64 +200,78 @@ if btn_reset:
 # โหมด Live (Firebase)
 # ==========================================
 if app_mode == "📡 โหมด Live (Firebase)":
-    start_btn = st.sidebar.button("🚀 เริ่มรันระบบ Live (Start)", type="primary", use_container_width=True)
-    st.sidebar.markdown("*(คลิกปุ่ม **Stop** มุมขวาบนเพื่อหยุดดึงข้อมูล)*")
+    
+    # 💡 1. สร้าง "ความจำ" ให้เว็บจำได้ว่าเราเคยกดปุ่ม Start ไปหรือยัง
+    if 'is_live_running' not in st.session_state:
+        st.session_state.is_live_running = False
+
+    # สร้างปุ่ม Start และ Stop ควบคู่กัน
+    col1, col2 = st.sidebar.columns(2)
+    start_btn = col1.button("🚀 Start Live", type="primary", use_container_width=True)
+    stop_btn = col2.button("🛑 Stop", use_container_width=True)
 
     if start_btn:
-        st.sidebar.success("📡 ระบบกำลังทำงานและแสดงผลต่อเนื่อง...")
+        st.session_state.is_live_running = True
+    if stop_btn:
+        st.session_state.is_live_running = False
+
+    # 💡 2. ถ้าระบบจำได้ว่า "กำลังรันอยู่" ก็ให้ทำงานต่อไปโดยไม่ต้องรอคนมากดซ้ำ
+    if st.session_state.is_live_running:
+        st.sidebar.success("📡 ระบบกำลังทำงานและแสดงผลต่อเนื่อง... (รันอัตโนมัติ)")
+        
         if gru_model_data is not None:
             mod_i, prep_i, y_scaler_i, seq_len_i = gru_model_data
             
-            # 💡 สร้างถังเก็บข้อมูลจริงก่อนเริ่มรัน
-            history_pm01 = []
-            try:
-                # ดึงประวัติค่าจาก Firebase (2,000 แถวล่าสุด) มาปูเป็นฐานกราฟก่อน
-                ref_hist = db.reference(FIREBASE_NODE_NAME).order_by_key().limit_to_last(2000).get()
-                if ref_hist:
-                    history_pm01 = [int(float(v.get('indoor_pc01_raw', 0)) / 1000) for k, v in ref_hist.items() if 'indoor_pc01_raw' in v]
-            except: pass
+            # 💡 3. เก็บถังประวัติข้อมูลไว้ใน ความจำของเว็บ (จะได้ไม่ต้องโหลดใหม่ทุกรอบ)
+            if 'history_pm01' not in st.session_state:
+                st.session_state.history_pm01 = []
+                try:
+                    ref_hist = db.reference(FIREBASE_NODE_NAME).order_by_key().limit_to_last(2000).get()
+                    if ref_hist:
+                        # หาร 1000 เพื่อแก้ปัญหากราฟสีแดงทะลุหลอดเรียบร้อยแล้ว!
+                        st.session_state.history_pm01 = [int(float(v.get('indoor_pc01_raw', 0)) / 1000) for k, v in ref_hist.items() if 'indoor_pc01_raw' in v]
+                except: pass
             
-            while True:
-                input_df = fetch_latest_firebase_data(limit=seq_len_i)
-                if not input_df.empty and len(input_df) >= seq_len_i:
-                    rename_map = {'wind_dir': 'Wind_Dir', 'wind_speed': 'Wind_Speed', 'outdoor_temp': 'Outdoor_Temperature', 
-                                  'outdoor_hum': 'Outdoor_Humidity', 'bar': 'Bar', 'outdoor_pm25': 'Outdoor_PM2.5'}
-                    input_df = input_df.rename(columns=rename_map)
-                    model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+            # 💡 4. ดึงข้อมูล 1 รอบ (ลบ while True ทิ้งไปเลย!)
+            input_df = fetch_latest_firebase_data(limit=seq_len_i)
+            if not input_df.empty and len(input_df) >= seq_len_i:
+                rename_map = {'wind_dir': 'Wind_Dir', 'wind_speed': 'Wind_Speed', 'outdoor_temp': 'Outdoor_Temperature', 
+                              'outdoor_hum': 'Outdoor_Humidity', 'bar': 'Bar', 'outdoor_pm25': 'Outdoor_PM2.5'}
+                input_df = input_df.rename(columns=rename_map)
+                model_cols = ['Wind_Dir', 'Wind_Speed', 'Outdoor_Temperature', 'Outdoor_Humidity', 'Bar', 'Outdoor_PM2.5']
+                
+                if all(col in input_df.columns for col in model_cols):
+                    X_proc_all = prep_i.transform(input_df[model_cols])
+                    seq_tensor = torch.FloatTensor(X_proc_all).unsqueeze(0).to(device) 
                     
-                    if all(col in input_df.columns for col in model_cols):
-                        X_proc_all = prep_i.transform(input_df[model_cols])
-                        seq_tensor = torch.FloatTensor(X_proc_all).unsqueeze(0).to(device) 
-                        
-                        mod_i.eval()
-                        with torch.no_grad(): out = mod_i(seq_tensor)
-                        
-                        raw_pred = y_scaler_i.inverse_transform(out.cpu().numpy())
-                        pred_val = int(raw_pred[0][0] / 1000) 
-                        
-                        # 💡 เอาค่าที่ทำนายได้ใหม่ ยัดใส่ถังประวัติ
-                        history_pm01.append(pred_val)
-                        
-                        # 💡 กันไม่ให้แรกล้น (เก็บสูงสุด 28,800 ข้อมูล = เท่ากับดึง 24 ชั่วโมง)
-                        if len(history_pm01) > 28800:
-                            history_pm01.pop(0)
-                        
-                        # 💡 สร้างอาร์เรย์ส่งให้กราฟ โดยคำนวณจากประวัติจริงๆ
-                        c_cur = calculate_trend(history_pm01[-6:], 6) # กราฟ 1: เอา 6 ค่าล่าสุดมาโชว์
-                        c_hr = calculate_trend(history_pm01[-1200:], 5) # กราฟ 2: ค่าเฉลี่ยรายชั่วโมง (ประมาณ 1200 จุด)
-                        c_day = calculate_trend(history_pm01[-28800:], 7) # กราฟ 3: ค่าเฉลี่ยรายวัน
-                        
-                        last_row = input_df.iloc[-1]
-                        pm25 = round(last_row['Outdoor_PM2.5'], 2)
-                        temp = round(last_row['Outdoor_Temperature'], 2)
-                        humid = round(last_row['Outdoor_Humidity'], 2)
-                        wind_dir = round(last_row['Wind_Dir'], 2)
-                        ai_text = generate_ai_insight(pred_val)
-                        
-                        # ยิงข้อมูลและกราฟจริงขึ้นจอ
-                        with injector_placeholder:
-                            components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text, c_cur, c_hr, c_day), height=0)
-                time.sleep(2)
+                    mod_i.eval()
+                    with torch.no_grad(): out = mod_i(seq_tensor)
+                    
+                    raw_pred = y_scaler_i.inverse_transform(out.cpu().numpy())
+                    pred_val = int(raw_pred[0][0] / 1000) 
+                    
+                    st.session_state.history_pm01.append(pred_val)
+                    if len(st.session_state.history_pm01) > 28800:
+                        st.session_state.history_pm01.pop(0)
+                    
+                    c_cur = calculate_trend(st.session_state.history_pm01[-6:], 6)
+                    c_hr = calculate_trend(st.session_state.history_pm01[-1200:], 5) 
+                    c_day = calculate_trend(st.session_state.history_pm01[-28800:], 7) 
+                    
+                    last_row = input_df.iloc[-1]
+                    pm25 = round(last_row['Outdoor_PM2.5'], 2)
+                    temp = round(last_row['Outdoor_Temperature'], 2)
+                    humid = round(last_row['Outdoor_Humidity'], 2)
+                    wind_dir = round(last_row['Wind_Dir'], 2)
+                    ai_text = generate_ai_insight(pred_val)
+                    
+                    with injector_placeholder:
+                        components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text, c_cur, c_hr, c_day), height=0)
+            
+            # 💡 5. พระเอกของงานนี้: ให้มันรอ 2 วินาที แล้วสั่ง "รีเฟรชตัวเองจากภายใน"
+            time.sleep(2)
+            st.rerun() 
+            
         else:
             st.sidebar.error("โมเดลไม่พร้อมทำงาน")
 
