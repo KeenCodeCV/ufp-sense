@@ -179,7 +179,7 @@ window.gArrDay = [0,0,0,0,0,0,0];
 let currentActiveModal = null; // เช็คว่าตอนนี้เปิด Popup หน้าไหนอยู่ ('current', 'hour', 'day')
 
 const commonOptions = {
-    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+    responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } },
     scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f3f4f6' } } },
     elements: { line: { tension: 0.4 }, point: { radius: 3, hoverRadius: 5 } }
 };
