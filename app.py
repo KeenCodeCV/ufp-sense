@@ -273,7 +273,7 @@ if app_mode == "📡 โหมด Live (Firebase)":
                         components.html(inject_data_to_ui(pred_val, pm25, temp, humid, wind_dir, ai_text, c_cur, c_hr, c_day), height=0)
             
             # 💡 5. พระเอกของงานนี้: ให้มันรอ 2 วินาที แล้วสั่ง "รีเฟรชตัวเองจากภายใน"
-            time.sleep(2)
+            time.sleep(1)
             st.rerun() 
             
         else:
