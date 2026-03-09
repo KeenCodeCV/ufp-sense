@@ -251,12 +251,15 @@ if app_mode == "📡 โหมด Live (Firebase)":
                     pred_val = int(raw_pred[0][0] / 1000) 
                     
                     st.session_state.history_pm01.append(pred_val)
-                    if len(st.session_state.history_pm01) > 28800:
+                    # 1 วันมี 86,400 วินาที เลยต้องเก็บความจำไว้ 86400 ข้อมูลครับ
+                    if len(st.session_state.history_pm01) > 86400:
                         st.session_state.history_pm01.pop(0)
                     
                     c_cur = calculate_trend(st.session_state.history_pm01[-6:], 6)
-                    c_hr = calculate_trend(st.session_state.history_pm01[-1200:], 5) 
-                    c_day = calculate_trend(st.session_state.history_pm01[-28800:], 7) 
+                    # 1 ชั่วโมงมี 3,600 วินาที
+                    c_hr = calculate_trend(st.session_state.history_pm01[-3600:], 5) 
+                    # 24 ชั่วโมงมี 86,400 วินาที
+                    c_day = calculate_trend(st.session_state.history_pm01[-86400:], 7)
                     
                     # 💡 บังคับให้จุดสุดท้าย (Now) ของกราฟเท่ากับค่าปัจจุบันเป๊ะๆ
                     if len(c_hr) > 0: c_hr[-1] = pred_val
@@ -343,8 +346,8 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
                     # 💡 กราฟในโหมด CSV ก็คำนวณจากค่าจริงในไฟล์ CSV ด้วย!
                     csv_preds = [int(p) for p in full_predictions if pd.notna(p)]
                     c_cur = calculate_trend(csv_preds[-6:], 6) if csv_preds else [0]*6
-                    c_hr = calculate_trend(csv_preds[-1200:], 5) if csv_preds else [0]*5
-                    c_day = calculate_trend(csv_preds[-28800:], 7) if csv_preds else [0]*7
+                    c_hr = calculate_trend(csv_preds[-3600:], 5) if csv_preds else [0]*5
+                    c_day = calculate_trend(csv_preds[-86400:], 7) if csv_preds else [0]*7
 
                     last_pred = download_df.iloc[-1]['Predict_GRU_Indoor_PC0.1']
                     pred_val = int(last_pred) if pd.notna(last_pred) else 0
