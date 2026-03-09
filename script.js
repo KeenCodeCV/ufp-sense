@@ -262,7 +262,7 @@ function updateModalData(type) {
     let bgColor = '';
 
     if (type === 'current') {
-        titleEl.innerHTML = '<i class="fa-solid fa-bolt text-blue-500"></i> Current (Live) Trend';
+        titleEl.innerHTML = '<i class="fa-solid fa-bolt text-blue-500"></i> Current Trend';
         subtitleEl.innerText = 'Real-time PC0.1 particle count updates';
         chartData = window.gArrCurrent;
         chartLabels = ['Min-25', 'Min-20', 'Min-15', 'Min-10', 'Min-5', 'Now'];
