@@ -84,7 +84,6 @@ window.updateStatus = function (value, aiText = null) {
     // เงื่อนไข 4 ระดับ
     // ===================================
     if (value <= 999) {
-        // === Safe (เขียว: <= 999) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#eef8eb]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#eef8eb]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#5dbb47]');
@@ -98,7 +97,6 @@ window.updateStatus = function (value, aiText = null) {
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#5dbb47] text-xl animate-bounce';
 
     } else if (value >= 1000 && value <= 9999) {
-        // === Moderate (เหลือง: 1,000 - 9,999) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#fef0b8]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#fef0b8]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#f0b100]');
@@ -112,7 +110,6 @@ window.updateStatus = function (value, aiText = null) {
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f0b100] text-xl animate-bounce';
 
     } else if (value >= 10000 && value <= 19999) {
-        // === High (ส้ม: 10,000 - 19,999) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#ffedd5]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#ffedd5]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#f97316]');
@@ -129,7 +126,6 @@ window.updateStatus = function (value, aiText = null) {
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f97316] text-xl animate-bounce';
 
     } else {
-        // === Danger (แดง: 20,000 ขึ้นไป) ===
         if (middleWrapper) middleWrapper.classList.add('bg-[#f8d7d7]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#f8d7d7]');
         if (iconBoxBg) iconBoxBg.classList.add('bg-[#d93a3a]');
@@ -172,21 +168,18 @@ window.updateWindDirection = function (degree) {
 // 5. ระบบกราฟ (Dynamic Chart.js) และ Modal Popup
 // ==========================================
 let chartCurrentObj, chartHourObj, chartDayObj, modalChartObj;
-// ตัวแปรเก็บข้อมูลล่าสุดไว้ใช้ตอนเปิด Popup
 window.gArrCurrent = [0,0,0,0,0,0];
 window.gArrHour = [0,0,0,0,0];
 window.gArrDay = [0,0,0,0,0,0,0];
-let currentActiveModal = null; // เช็คว่าตอนนี้เปิด Popup หน้าไหนอยู่ ('current', 'hour', 'day')
+let currentActiveModal = null; 
 
 const commonOptions = {
-    // 👇 แก้คำเดียวตรงนี้: false -> true
     responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } },
     scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f3f4f6' } } },
     elements: { line: { tension: 0.4 }, point: { radius: 3, hoverRadius: 5 } }
 };
 
 window.updateCharts = function (arrCurrent, arrHour, arrDay) {
-    // อัปเดตข้อมูลเก็บไว้ในตัวแปร Global
     window.gArrCurrent = arrCurrent;
     window.gArrHour = arrHour;
     window.gArrDay = arrDay;
@@ -213,24 +206,18 @@ window.updateCharts = function (arrCurrent, arrHour, arrDay) {
     const ctx3 = document.getElementById('chartDay');
     if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Now'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });
 
-    // 💡 ถ้า Popup เปิดอยู่ ให้กราฟใน Popup อัปเดตแบบ Real-time ไปด้วย!
     if (currentActiveModal) {
         updateModalData(currentActiveModal);
     }
 }
 
-// ------------------------------------------------
-// ฟังก์ชันจัดการ Popup (Modal)
-// ------------------------------------------------
 window.openChartModal = function(type) {
     currentActiveModal = type;
     const modal = document.getElementById('chartModal');
     const modalContent = document.getElementById('modalContent');
     
-    // อัปเดตข้อมูลกราฟและสถิติ
     updateModalData(type);
     
-    // โชว์ Popup พร้อม Animation
     modal.classList.remove('hidden');
     setTimeout(() => {
         modalContent.classList.add('modal-content-show');
@@ -245,7 +232,7 @@ window.closeChartModal = function() {
     modalContent.classList.remove('modal-content-show');
     setTimeout(() => {
         modal.classList.add('hidden');
-    }, 300); // รอให้อนิเมชันย่อขนาดจบก่อนค่อยซ่อน
+    }, 300); 
 }
 
 function updateModalData(type) {
@@ -254,7 +241,7 @@ function updateModalData(type) {
     const maxEl = document.getElementById('modalMax');
     const avgEl = document.getElementById('modalAvg');
     const minEl = document.getElementById('modalMin');
-    const nowEl = document.getElementById('modalNow'); // 💡 1. เพิ่มตัวแปรดึง ID กล่อง Now
+    const nowEl = document.getElementById('modalNow');
     
     let chartData = [];
     let chartLabels = [];
@@ -285,22 +272,20 @@ function updateModalData(type) {
         bgColor = avg > 10000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(245, 158, 11, 0.1)';
     }
 
-    // 💡 2. คำนวณสถิติ Max, Min, Avg และ Now
     const maxVal = Math.max(...chartData);
     const minVal = Math.min(...chartData);
     const avgVal = Math.round(chartData.reduce((a, b) => a + b, 0) / chartData.length);
-    const nowVal = chartData[chartData.length - 1]; // 💡 ดึงค่าสุดท้ายของอาร์เรย์ (คือจุด Now)
+    const nowVal = chartData[chartData.length - 1]; 
 
-    // 💡 3. เอาตัวเลขไปใส่ในกล่องหน้าเว็บ
     maxEl.innerText = maxVal.toLocaleString();
     minEl.innerText = minVal.toLocaleString();
     avgEl.innerText = avgVal.toLocaleString();
-    nowEl.innerText = nowVal.toLocaleString(); // 💡 อัปเดตกล่อง Now
+    nowEl.innerText = nowVal.toLocaleString(); 
 
-    // วาดกราฟใน Popup
     const ctx = document.getElementById('modalChartCanvas');
     if (modalChartObj) modalChartObj.destroy();
     
+    // 👇 ส่วนที่แก้ไข: วาดกราฟพร้อมโชว์ตัวเลข (Data Labels)
     modalChartObj = new Chart(ctx, {
         type: 'line',
         data: {
@@ -316,21 +301,34 @@ function updateModalData(type) {
                 pointHoverRadius: 8
             }]
         },
+        plugins: [ChartDataLabels], // เรียกใช้ Plugin โชว์ตัวเลข
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { x: { grid: { display: false } }, y: { beginAtZero: true } },
+            layout: { padding: { top: 30, right: 20, left: 20 } },
+            plugins: { 
+                legend: { display: false },
+                // ตั้งค่าตัวเลขบนจุดกราฟ
+                datalabels: {
+                    align: 'top',
+                    anchor: 'end',
+                    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                    borderRadius: 6,
+                    color: lineColor,
+                    font: { family: 'Prompt', weight: 'bold', size: 13 },
+                    formatter: function(value) { return value.toLocaleString(); },
+                    padding: { top: 2, bottom: 2, left: 6, right: 6 }
+                }
+            },
+            scales: { 
+                x: { grid: { display: false } }, 
+                y: { beginAtZero: true, grace: '15%' } 
+            },
             elements: { line: { tension: 0.4 } },
             animation: { duration: 0 } 
         }
     });
 }
-
-// โหลดกราฟตั้งต้นตอนเปิดเว็บ
-setTimeout(() => {
-    if (window.updateCharts) updateCharts([0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]);
-}, 200);
 
 // ==========================================
 // 6. Test Mode & Reset System
@@ -381,7 +379,6 @@ window.resetSystem = function () {
     const suggestionText = document.getElementById('suggestionText');
     const alertIcon = document.getElementById('alertIcon');
 
-    // 👉 คืนค่าปุ่ม Real-time กลับเป็นสีแดง (สถานะรอข้อมูล)
     const realTimeIndicator = document.getElementById('realTimeIndicator');
     const rtPing = document.getElementById('rtPing');
     const rtDot = document.getElementById('rtDot');
@@ -407,34 +404,32 @@ window.resetSystem = function () {
     }
     if (iconBoxBg) {
         iconBoxBg.classList.remove(...allBgs);
-        iconBoxBg.classList.add('bg-slate-300'); // กล่องหน้าคนเป็นสีเทา
+        iconBoxBg.classList.add('bg-slate-300'); 
     }
     if (pm01Value) {
         pm01Value.innerText = '--';
         pm01Value.classList.remove(...allTexts);
-        pm01Value.classList.add('text-slate-400'); // ตัวเลขเป็นสีเทา
+        pm01Value.classList.add('text-slate-400'); 
     }
     if (pm01Unit) {
         pm01Unit.classList.remove(...allTexts);
-        pm01Unit.classList.add('text-slate-400'); // หน่วยเป็นสีเทา
+        pm01Unit.classList.add('text-slate-400'); 
     }
     if (pm01StatusPill) {
         pm01StatusPill.classList.remove(...allTexts);
-        pm01StatusPill.classList.add('text-slate-500'); // ป้ายสถานะเป็นสีเทา
+        pm01StatusPill.classList.add('text-slate-500'); 
     }
 
-    if (indoorIcon) indoorIcon.src = 'https://img5.pic.in.th/file/secure-sv1/Safe123.png'; // กลับมาหน้ายิ้ม
+    if (indoorIcon) indoorIcon.src = 'https://img5.pic.in.th/file/secure-sv1/Safe123.png'; 
     if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-spinner fa-spin mr-2 text-lg';
     if (pm01StatusText) {
         pm01StatusText.innerText = 'Status: Waiting...';
-        pm01StatusText.classList.remove('text-blink'); // เอากระพริบออก
+        pm01StatusText.classList.remove('text-blink'); 
     }
-    if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-slate-400 text-xl animate-bounce'; // หุ่นยนต์สีเทา
+    if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-slate-400 text-xl animate-bounce'; 
     
-    // 👉 เปลี่ยนข้อความรอโหลดเป็นภาษาอังกฤษ
     if (suggestionText) suggestionText.innerText = 'Waiting for sensor data to analyze the environmental conditions...';
 
-    // รีเซ็ตค่าการ์ดด้านนอก
     updateText('val-pm25', '--');
     updateText('val-temp', '--');
     updateText('val-humid', '--');
