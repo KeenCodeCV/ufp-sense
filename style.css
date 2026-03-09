@@ -422,3 +422,15 @@ body {
         transform: rotate(-1turn);
     }
 }
+
+/* ========================================= */
+/* Modal Popup Animation                     */
+/* ========================================= */
+.modal-show {
+    display: flex !important;
+}
+
+.modal-content-show {
+    transform: scale(1) !important;
+    opacity: 1 !important;
+}

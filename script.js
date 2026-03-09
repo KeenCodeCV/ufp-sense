@@ -80,8 +80,8 @@ window.updateStatus = function (value, aiText = null) {
     if (pm01StatusPill) pm01StatusPill.classList.remove(...allTexts, 'animate-pulse');
     if (pm01StatusText) pm01StatusText.classList.remove('text-blink');
 
-// ===================================
-    // เงื่อนไข 4 ระดับ (อัปเดตเกณฑ์ใหม่ล่าสุด!)
+    // ===================================
+    // เงื่อนไข 4 ระดับ
     // ===================================
     if (value <= 999) {
         // === Safe (เขียว: <= 999) ===
@@ -169,16 +169,27 @@ window.updateWindDirection = function (degree) {
 }
 
 // ==========================================
-// 5. ระบบกราฟ (Dynamic Chart.js)
+// 5. ระบบกราฟ (Dynamic Chart.js) และ Modal Popup
 // ==========================================
-let chartCurrentObj, chartHourObj, chartDayObj;
+let chartCurrentObj, chartHourObj, chartDayObj, modalChartObj;
+// ตัวแปรเก็บข้อมูลล่าสุดไว้ใช้ตอนเปิด Popup
+window.gArrCurrent = [0,0,0,0,0,0];
+window.gArrHour = [0,0,0,0,0];
+window.gArrDay = [0,0,0,0,0,0,0];
+let currentActiveModal = null; // เช็คว่าตอนนี้เปิด Popup หน้าไหนอยู่ ('current', 'hour', 'day')
+
 const commonOptions = {
-    responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } },
+    responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
     scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f3f4f6' } } },
     elements: { line: { tension: 0.4 }, point: { radius: 3, hoverRadius: 5 } }
 };
 
 window.updateCharts = function (arrCurrent, arrHour, arrDay) {
+    // อัปเดตข้อมูลเก็บไว้ในตัวแปร Global
+    window.gArrCurrent = arrCurrent;
+    window.gArrHour = arrHour;
+    window.gArrDay = arrDay;
+
     if (chartCurrentObj) chartCurrentObj.destroy();
     if (chartHourObj) chartHourObj.destroy();
     if (chartDayObj) chartDayObj.destroy();
@@ -193,16 +204,123 @@ window.updateCharts = function (arrCurrent, arrHour, arrDay) {
     const bgDay = avgDay > 10000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(245, 158, 11, 0.1)';
 
     const ctx1 = document.getElementById('chartCurrent');
-    // เปลี่ยน t-25... เป็น Min-25... และ Live เป็น Now
     if (ctx1) chartCurrentObj = new Chart(ctx1, { type: 'line', data: { labels: ['Min-25', 'Min-20', 'Min-15', 'Min-10', 'Min-5', 'Now'], datasets: [{ data: arrCurrent, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, borderWidth: 2 }] }, options: commonOptions });
 
     const ctx2 = document.getElementById('chartHour');
-    // กราฟชั่วโมงมี Now อยู่แล้ว ไม่ต้องเปลี่ยน
     if (ctx2) chartHourObj = new Chart(ctx2, { type: 'line', data: { labels: ['H-4', 'H-3', 'H-2', 'H-1', 'Now'], datasets: [{ data: arrHour, borderColor: colorHour, backgroundColor: bgHour, fill: true, borderWidth: 2 }] }, options: commonOptions });
 
     const ctx3 = document.getElementById('chartDay');
-    // เปลี่ยน Today เป็น Now
-    if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Now'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });}
+    if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Now'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });
+
+    // 💡 ถ้า Popup เปิดอยู่ ให้กราฟใน Popup อัปเดตแบบ Real-time ไปด้วย!
+    if (currentActiveModal) {
+        updateModalData(currentActiveModal);
+    }
+}
+
+// ------------------------------------------------
+// ฟังก์ชันจัดการ Popup (Modal)
+// ------------------------------------------------
+window.openChartModal = function(type) {
+    currentActiveModal = type;
+    const modal = document.getElementById('chartModal');
+    const modalContent = document.getElementById('modalContent');
+    
+    // อัปเดตข้อมูลกราฟและสถิติ
+    updateModalData(type);
+    
+    // โชว์ Popup พร้อม Animation
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modalContent.classList.add('modal-content-show');
+    }, 10);
+}
+
+window.closeChartModal = function() {
+    currentActiveModal = null;
+    const modal = document.getElementById('chartModal');
+    const modalContent = document.getElementById('modalContent');
+    
+    modalContent.classList.remove('modal-content-show');
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 300); // รอให้อนิเมชันย่อขนาดจบก่อนค่อยซ่อน
+}
+
+function updateModalData(type) {
+    const titleEl = document.getElementById('modalTitle');
+    const subtitleEl = document.getElementById('modalSubtitle');
+    const maxEl = document.getElementById('modalMax');
+    const avgEl = document.getElementById('modalAvg');
+    const minEl = document.getElementById('modalMin');
+    
+    let chartData = [];
+    let chartLabels = [];
+    let lineColor = '';
+    let bgColor = '';
+
+    if (type === 'current') {
+        titleEl.innerHTML = '<i class="fa-solid fa-bolt text-blue-500"></i> Current (Live) Trend';
+        subtitleEl.innerText = 'Real-time PC0.1 particle count updates';
+        chartData = window.gArrCurrent;
+        chartLabels = ['Min-25', 'Min-20', 'Min-15', 'Min-10', 'Min-5', 'Now'];
+        lineColor = '#3b82f6'; bgColor = 'rgba(59, 130, 246, 0.1)';
+    } else if (type === 'hour') {
+        titleEl.innerHTML = '<i class="fa-solid fa-clock text-emerald-500"></i> 1 Hour Average Trend';
+        subtitleEl.innerText = 'Hourly average distribution';
+        chartData = window.gArrHour;
+        chartLabels = ['H-4', 'H-3', 'H-2', 'H-1', 'Now'];
+        const avg = chartData.reduce((a,b)=>a+b,0)/chartData.length;
+        lineColor = avg > 20000 ? '#d93a3a' : '#10b981'; 
+        bgColor = avg > 20000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(16, 185, 129, 0.1)';
+    } else if (type === 'day') {
+        titleEl.innerHTML = '<i class="fa-solid fa-calendar-day text-orange-500"></i> 24 Hours Average Trend';
+        subtitleEl.innerText = 'Daily overview of air quality';
+        chartData = window.gArrDay;
+        chartLabels = ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Now'];
+        const avg = chartData.reduce((a,b)=>a+b,0)/chartData.length;
+        lineColor = avg > 10000 ? '#d93a3a' : '#f59e0b'; 
+        bgColor = avg > 10000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+    }
+
+    // คำนวณสถิติ Max, Min, Avg
+    const maxVal = Math.max(...chartData);
+    const minVal = Math.min(...chartData);
+    const avgVal = Math.round(chartData.reduce((a, b) => a + b, 0) / chartData.length);
+
+    maxEl.innerText = maxVal.toLocaleString();
+    minEl.innerText = minVal.toLocaleString();
+    avgEl.innerText = avgVal.toLocaleString();
+
+    // วาดกราฟใน Popup
+    const ctx = document.getElementById('modalChartCanvas');
+    if (modalChartObj) modalChartObj.destroy();
+    
+    modalChartObj = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartLabels,
+            datasets: [{
+                label: 'PC0.1 Count',
+                data: chartData,
+                borderColor: lineColor,
+                backgroundColor: bgColor,
+                fill: true,
+                borderWidth: 3,
+                pointRadius: 5,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { grid: { display: false } }, y: { beginAtZero: true } },
+            elements: { line: { tension: 0.4 } },
+            animation: { duration: 0 } // ปิดอนิเมชันตอนอัปเดต Real-time ให้ดูกลืนไปเลย
+        }
+    });
+}
 
 // โหลดกราฟตั้งต้นตอนเปิดเว็บ
 setTimeout(() => {
