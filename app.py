@@ -258,6 +258,10 @@ if app_mode == "📡 โหมด Live (Firebase)":
                     c_hr = calculate_trend(st.session_state.history_pm01[-1200:], 5) 
                     c_day = calculate_trend(st.session_state.history_pm01[-28800:], 7) 
                     
+                    # 💡 บังคับให้จุดสุดท้าย (Now) ของกราฟเท่ากับค่าปัจจุบันเป๊ะๆ
+                    if len(c_hr) > 0: c_hr[-1] = pred_val
+                    if len(c_day) > 0: c_day[-1] = pred_val 
+                    
                     last_row = input_df.iloc[-1]
                     pm25 = round(last_row['Outdoor_PM2.5'], 2)
                     temp = round(last_row['Outdoor_Temperature'], 2)
@@ -344,6 +348,10 @@ elif app_mode == "📂 โหมด Test (Upload CSV)":
 
                     last_pred = download_df.iloc[-1]['Predict_GRU_Indoor_PC0.1']
                     pred_val = int(last_pred) if pd.notna(last_pred) else 0
+                    
+                    # 💡 บังคับให้จุดสุดท้าย (Now) ของกราฟเท่ากับค่าปัจจุบันเป๊ะๆ (โหมด CSV)
+                    if len(c_hr) > 0: c_hr[-1] = pred_val
+                    if len(c_day) > 0: c_day[-1] = pred_val
 
                     last_row = input_df.iloc[-1]
                     pm25 = round(last_row['Outdoor_PM2.5'], 2)

@@ -193,14 +193,16 @@ window.updateCharts = function (arrCurrent, arrHour, arrDay) {
     const bgDay = avgDay > 10000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(245, 158, 11, 0.1)';
 
     const ctx1 = document.getElementById('chartCurrent');
-    if (ctx1) chartCurrentObj = new Chart(ctx1, { type: 'line', data: { labels: ['t-25', 't-20', 't-15', 't-10', 't-5', 'Live'], datasets: [{ data: arrCurrent, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, borderWidth: 2 }] }, options: commonOptions });
+    // เปลี่ยน t-25... เป็น Min-25... และ Live เป็น Now
+    if (ctx1) chartCurrentObj = new Chart(ctx1, { type: 'line', data: { labels: ['Min-25', 'Min-20', 'Min-15', 'Min-10', 'Min-5', 'Now'], datasets: [{ data: arrCurrent, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, borderWidth: 2 }] }, options: commonOptions });
 
     const ctx2 = document.getElementById('chartHour');
+    // กราฟชั่วโมงมี Now อยู่แล้ว ไม่ต้องเปลี่ยน
     if (ctx2) chartHourObj = new Chart(ctx2, { type: 'line', data: { labels: ['H-4', 'H-3', 'H-2', 'H-1', 'Now'], datasets: [{ data: arrHour, borderColor: colorHour, backgroundColor: bgHour, fill: true, borderWidth: 2 }] }, options: commonOptions });
 
     const ctx3 = document.getElementById('chartDay');
-    if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Today'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });
-}
+    // เปลี่ยน Today เป็น Now
+    if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Now'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });}
 
 // โหลดกราฟตั้งต้นตอนเปิดเว็บ
 setTimeout(() => {
