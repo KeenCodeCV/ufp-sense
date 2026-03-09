@@ -253,6 +253,7 @@ function updateModalData(type) {
     const maxEl = document.getElementById('modalMax');
     const avgEl = document.getElementById('modalAvg');
     const minEl = document.getElementById('modalMin');
+    const nowEl = document.getElementById('modalNow'); // 💡 1. เพิ่มตัวแปรดึง ID กล่อง Now
     
     let chartData = [];
     let chartLabels = [];
@@ -283,14 +284,17 @@ function updateModalData(type) {
         bgColor = avg > 10000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(245, 158, 11, 0.1)';
     }
 
-    // คำนวณสถิติ Max, Min, Avg
+    // 💡 2. คำนวณสถิติ Max, Min, Avg และ Now
     const maxVal = Math.max(...chartData);
     const minVal = Math.min(...chartData);
     const avgVal = Math.round(chartData.reduce((a, b) => a + b, 0) / chartData.length);
+    const nowVal = chartData[chartData.length - 1]; // 💡 ดึงค่าสุดท้ายของอาร์เรย์ (คือจุด Now)
 
+    // 💡 3. เอาตัวเลขไปใส่ในกล่องหน้าเว็บ
     maxEl.innerText = maxVal.toLocaleString();
     minEl.innerText = minVal.toLocaleString();
     avgEl.innerText = avgVal.toLocaleString();
+    nowEl.innerText = nowVal.toLocaleString(); // 💡 อัปเดตกล่อง Now
 
     // วาดกราฟใน Popup
     const ctx = document.getElementById('modalChartCanvas');
@@ -317,7 +321,7 @@ function updateModalData(type) {
             plugins: { legend: { display: false } },
             scales: { x: { grid: { display: false } }, y: { beginAtZero: true } },
             elements: { line: { tension: 0.4 } },
-            animation: { duration: 0 } // ปิดอนิเมชันตอนอัปเดต Real-time ให้ดูกลืนไปเลย
+            animation: { duration: 0 } 
         }
     });
 }
