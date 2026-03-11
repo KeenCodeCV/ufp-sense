@@ -47,7 +47,6 @@ window.updateStatus = function (value, aiText = null) {
 
     if (pm01Value) pm01Value.textContent = value.toLocaleString();
 
-    // 👉 เมื่อมีข้อมูลเข้ามา ให้เปลี่ยนปุ่ม Real-time เป็นสีเขียว
     const realTimeIndicator = document.getElementById('realTimeIndicator');
     const rtPing = document.getElementById('rtPing');
     const rtDot = document.getElementById('rtDot');
@@ -59,7 +58,6 @@ window.updateStatus = function (value, aiText = null) {
     if (rtPing) rtPing.classList.replace('bg-red-400', 'bg-green-400');
     if (rtDot) rtDot.classList.replace('bg-red-500', 'bg-green-500');
 
-    // 👉 ดักจับกรณีไม่มีข้อความ AI ส่งมา (ตอนกด Test System) ให้ใช้คำภาษาอังกฤษ
     if (!aiText) {
         if (value >= 20000) aiText = "Hazardous air conditions detected. Please remain indoors, keep all windows closed, and use high-efficiency air purifiers immediately.";
         else if (value >= 10000) aiText = "Air quality is noticeably reduced. It is highly recommended to turn on air purifiers and minimize outdoor activities.";
@@ -67,7 +65,6 @@ window.updateStatus = function (value, aiText = null) {
         else aiText = "The air quality is excellent. The environment is safe, making it a great time for normal activities and natural ventilation.";
     }
 
-    // เพิ่มชุดสีเข้าไป
     const allBgs = ['bg-[#5dbb47]', 'bg-[#f0b100]', 'bg-[#f97316]', 'bg-[#d93a3a]', 'bg-slate-300'];
     const allLightBgs = ['bg-[#eef8eb]', 'bg-[#fef0b8]', 'bg-[#ffedd5]', 'bg-[#f8d7d7]', 'bg-slate-50'];
     const allTexts = ['text-[#5dbb47]', 'text-[#f0b100]', 'text-[#f97316]', 'text-[#d93a3a]', 'text-slate-400', 'text-slate-500'];
@@ -80,9 +77,6 @@ window.updateStatus = function (value, aiText = null) {
     if (pm01StatusPill) pm01StatusPill.classList.remove(...allTexts, 'animate-pulse');
     if (pm01StatusText) pm01StatusText.classList.remove('text-blink');
 
-    // ===================================
-    // เงื่อนไข 4 ระดับ
-    // ===================================
     if (value <= 999) {
         if (middleWrapper) middleWrapper.classList.add('bg-[#eef8eb]');
         if (alertBoxBg) alertBoxBg.classList.add('bg-[#eef8eb]');
@@ -90,7 +84,6 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01Value) pm01Value.classList.add('text-[#5dbb47]');
         if (pm01Unit) pm01Unit.classList.add('text-[#5dbb47]');
         if (pm01StatusPill) pm01StatusPill.classList.add('text-[#5dbb47]');
-
         if (indoorIcon) indoorIcon.src = 'https://img5.pic.in.th/file/secure-sv1/Safe123.png';
         if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-circle-check mr-2 text-lg';
         if (pm01StatusText) pm01StatusText.innerText = 'Status: Safe';
@@ -103,7 +96,6 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01Value) pm01Value.classList.add('text-[#f0b100]');
         if (pm01Unit) pm01Unit.classList.add('text-[#f0b100]');
         if (pm01StatusPill) pm01StatusPill.classList.add('text-[#f0b100]');
-
         if (indoorIcon) indoorIcon.src = 'https://img2.pic.in.th/Warning123.png';
         if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-triangle-exclamation mr-2 text-lg';
         if (pm01StatusText) pm01StatusText.innerText = 'Status: Moderate';
@@ -116,13 +108,9 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01Value) pm01Value.classList.add('text-[#f97316]');
         if (pm01Unit) pm01Unit.classList.add('text-[#f97316]');
         if (pm01StatusPill) pm01StatusPill.classList.add('text-[#f97316]');
-
         if (indoorIcon) indoorIcon.src = 'https://img2.pic.in.th/641319986_1432330355266272_9107297040447500607_n-removebg-preview.png';
         if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-bell mr-2 text-lg';
-        if (pm01StatusText) {
-            pm01StatusText.innerText = 'Status: High';
-            pm01StatusText.classList.add('text-blink');
-        }
+        if (pm01StatusText) { pm01StatusText.innerText = 'Status: High'; pm01StatusText.classList.add('text-blink'); }
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#f97316] text-xl animate-bounce';
 
     } else {
@@ -132,17 +120,12 @@ window.updateStatus = function (value, aiText = null) {
         if (pm01Value) pm01Value.classList.add('text-[#d93a3a]');
         if (pm01Unit) pm01Unit.classList.add('text-[#d93a3a]');
         if (pm01StatusPill) pm01StatusPill.classList.add('text-[#d93a3a]');
-
         if (indoorIcon) indoorIcon.src = 'https://img2.pic.in.th/Danger123.png';
         if (pm01StatusIcon) pm01StatusIcon.className = 'fa-solid fa-skull-crossbones mr-2 text-lg';
-        if (pm01StatusText) {
-            pm01StatusText.innerText = 'Status: Danger';
-            pm01StatusText.classList.add('text-blink');
-        }
+        if (pm01StatusText) { pm01StatusText.innerText = 'Status: Danger'; pm01StatusText.classList.add('text-blink'); }
         if (alertIcon) alertIcon.className = 'fa-solid fa-robot text-[#d93a3a] text-xl animate-bounce';
     }
     
-    // อัปเดตข้อความ AI
     if (suggestionText) suggestionText.textContent = aiText;
 }
 
@@ -165,7 +148,7 @@ window.updateWindDirection = function (degree) {
 }
 
 // ==========================================
-// 5. ระบบกราฟ (Dynamic Chart.js) และ Modal Popup
+// 5. ระบบกราฟ (Dynamic Chart.js) แบบอัปเดต (ไม่ทำลายทิ้ง)
 // ==========================================
 let chartCurrentObj, chartHourObj, chartDayObj, modalChartObj;
 window.gArrCurrent = [0,0,0,0,0,0];
@@ -174,19 +157,18 @@ window.gArrDay = [0,0,0,0,0,0,0];
 let currentActiveModal = null; 
 
 const commonOptions = {
-    responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } },
+    responsive: true, 
+    maintainAspectRatio: false, // 💡 ปิดการรักษาสัดส่วน เพื่อไม่ให้กราฟเด้งบนมือถือ
+    plugins: { legend: { display: false } },
     scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f3f4f6' } } },
-    elements: { line: { tension: 0.4 }, point: { radius: 3, hoverRadius: 5 } }
+    elements: { line: { tension: 0.4 }, point: { radius: 3, hoverRadius: 5 } },
+    animation: { duration: 0 } // ป้องกันอนิเมชันซ้อนทับกัน
 };
 
 window.updateCharts = function (arrCurrent, arrHour, arrDay) {
     window.gArrCurrent = arrCurrent;
     window.gArrHour = arrHour;
     window.gArrDay = arrDay;
-
-    if (chartCurrentObj) chartCurrentObj.destroy();
-    if (chartHourObj) chartHourObj.destroy();
-    if (chartDayObj) chartDayObj.destroy();
 
     const avgHour = arrHour.reduce((a, b) => a + b, 0) / arrHour.length;
     const avgDay = arrDay.reduce((a, b) => a + b, 0) / arrDay.length;
@@ -197,14 +179,34 @@ window.updateCharts = function (arrCurrent, arrHour, arrDay) {
     const colorDay = avgDay > 10000 ? '#d93a3a' : '#f59e0b';
     const bgDay = avgDay > 10000 ? 'rgba(217, 58, 58, 0.1)' : 'rgba(245, 158, 11, 0.1)';
 
+    // 💡 ใช้วิธีอัปเดตข้อมูล แทนการลบทิ้ง (Destroy)
     const ctx1 = document.getElementById('chartCurrent');
-    if (ctx1) chartCurrentObj = new Chart(ctx1, { type: 'line', data: { labels: ['Min-25', 'Min-20', 'Min-15', 'Min-10', 'Min-5', 'Now'], datasets: [{ data: arrCurrent, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, borderWidth: 2 }] }, options: commonOptions });
+    if (chartCurrentObj && ctx1) {
+        chartCurrentObj.data.datasets[0].data = arrCurrent;
+        chartCurrentObj.update('none');
+    } else if (ctx1) {
+        chartCurrentObj = new Chart(ctx1, { type: 'line', data: { labels: ['Min-25', 'Min-20', 'Min-15', 'Min-10', 'Min-5', 'Now'], datasets: [{ data: arrCurrent, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, borderWidth: 2 }] }, options: commonOptions });
+    }
 
     const ctx2 = document.getElementById('chartHour');
-    if (ctx2) chartHourObj = new Chart(ctx2, { type: 'line', data: { labels: ['H-4', 'H-3', 'H-2', 'H-1', 'Now'], datasets: [{ data: arrHour, borderColor: colorHour, backgroundColor: bgHour, fill: true, borderWidth: 2 }] }, options: commonOptions });
+    if (chartHourObj && ctx2) {
+        chartHourObj.data.datasets[0].data = arrHour;
+        chartHourObj.data.datasets[0].borderColor = colorHour;
+        chartHourObj.data.datasets[0].backgroundColor = bgHour;
+        chartHourObj.update('none');
+    } else if (ctx2) {
+        chartHourObj = new Chart(ctx2, { type: 'line', data: { labels: ['H-4', 'H-3', 'H-2', 'H-1', 'Now'], datasets: [{ data: arrHour, borderColor: colorHour, backgroundColor: bgHour, fill: true, borderWidth: 2 }] }, options: commonOptions });
+    }
 
     const ctx3 = document.getElementById('chartDay');
-    if (ctx3) chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Now'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });
+    if (chartDayObj && ctx3) {
+        chartDayObj.data.datasets[0].data = arrDay;
+        chartDayObj.data.datasets[0].borderColor = colorDay;
+        chartDayObj.data.datasets[0].backgroundColor = bgDay;
+        chartDayObj.update('none');
+    } else if (ctx3) {
+        chartDayObj = new Chart(ctx3, { type: 'line', data: { labels: ['D-6', 'D-5', 'D-4', 'D-3', 'D-2', 'D-1', 'Now'], datasets: [{ data: arrDay, borderColor: colorDay, backgroundColor: bgDay, fill: true, borderWidth: 2 }] }, options: commonOptions });
+    }
 
     if (currentActiveModal) {
         updateModalData(currentActiveModal);
@@ -212,6 +214,11 @@ window.updateCharts = function (arrCurrent, arrHour, arrDay) {
 }
 
 window.openChartModal = function(type) {
+    // ถ้าย้ายไปเปิดกราฟอื่น ให้เคลียร์กราฟใน Popup ทิ้งก่อนเพื่อวาดใหม่ให้สีตรง
+    if (currentActiveModal !== type && modalChartObj) {
+        modalChartObj.destroy();
+        modalChartObj = null;
+    }
     currentActiveModal = type;
     const modal = document.getElementById('chartModal');
     const modalContent = document.getElementById('modalContent');
@@ -283,51 +290,58 @@ function updateModalData(type) {
     nowEl.innerText = nowVal.toLocaleString(); 
 
     const ctx = document.getElementById('modalChartCanvas');
-    if (modalChartObj) modalChartObj.destroy();
     
-    // 👇 ส่วนที่แก้ไข: วาดกราฟพร้อมโชว์ตัวเลข (Data Labels)
-    modalChartObj = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: chartLabels,
-            datasets: [{
-                label: 'PC0.1 Count',
-                data: chartData,
-                borderColor: lineColor,
-                backgroundColor: bgColor,
-                fill: true,
-                borderWidth: 3,
-                pointRadius: 5,
-                pointHoverRadius: 8
-            }]
-        },
-        plugins: [ChartDataLabels], // เรียกใช้ Plugin โชว์ตัวเลข
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { top: 30, right: 20, left: 20 } },
-            plugins: { 
-                legend: { display: false },
-                // ตั้งค่าตัวเลขบนจุดกราฟ
-                datalabels: {
-                    align: 'top',
-                    anchor: 'end',
-                    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-                    borderRadius: 6,
-                    color: lineColor,
-                    font: { family: 'Prompt', weight: 'bold', size: 13 },
-                    formatter: function(value) { return value.toLocaleString(); },
-                    padding: { top: 2, bottom: 2, left: 6, right: 6 }
-                }
+    // 💡 ใช้วิธีอัปเดตข้อมูล แทนการลบทิ้ง (Destroy) ใน Popup
+    if (modalChartObj) {
+        modalChartObj.data.labels = chartLabels;
+        modalChartObj.data.datasets[0].data = chartData;
+        modalChartObj.data.datasets[0].borderColor = lineColor;
+        modalChartObj.data.datasets[0].backgroundColor = bgColor;
+        modalChartObj.options.plugins.datalabels.color = lineColor;
+        modalChartObj.update('none');
+    } else {
+        modalChartObj = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    label: 'PC0.1 Count',
+                    data: chartData,
+                    borderColor: lineColor,
+                    backgroundColor: bgColor,
+                    fill: true,
+                    borderWidth: 3,
+                    pointRadius: 5,
+                    pointHoverRadius: 8
+                }]
             },
-            scales: { 
-                x: { grid: { display: false } }, 
-                y: { beginAtZero: true, grace: '15%' } 
-            },
-            elements: { line: { tension: 0.4 } },
-            animation: { duration: 0 } 
-        }
-    });
+            plugins: [ChartDataLabels],
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: { padding: { top: 30, right: 20, left: 20 } },
+                plugins: { 
+                    legend: { display: false },
+                    datalabels: {
+                        align: 'top',
+                        anchor: 'end',
+                        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                        borderRadius: 6,
+                        color: lineColor,
+                        font: { family: 'Prompt', weight: 'bold', size: 13 },
+                        formatter: function(value) { return value.toLocaleString(); },
+                        padding: { top: 2, bottom: 2, left: 6, right: 6 }
+                    }
+                },
+                scales: { 
+                    x: { grid: { display: false } }, 
+                    y: { beginAtZero: true, grace: '15%' } 
+                },
+                elements: { line: { tension: 0.4 } },
+                animation: { duration: 0 } 
+            }
+        });
+    }
 }
 
 // ==========================================
